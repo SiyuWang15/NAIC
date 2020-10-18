@@ -1,3 +1,9 @@
+# My own 
+*pth*
+*.vscode*
+*.mat
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
