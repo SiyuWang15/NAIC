@@ -104,7 +104,7 @@ class ResizeConv2d(nn.Module):
         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride=1, padding=1)
 
     def forward(self, x):
-        x = F.interpolate(x, scale_factor=self.scale_factor, mode=self.mode)
+        x = F.interpolate(x, scale_factor=self.scale_factor, mode=self.mode, recompute_scale_factor = True)
         x = self.conv(x)
         return x
 
@@ -214,12 +214,12 @@ class Encoder(nn.Module):
 class Decoder(nn.Module):
     B = 4
 
-    def __init__(self, feedback_bits = 128, quantization=True, nc = 2, num_Blocks = [2,2,2,2]):
+    def __init__(self, feedback_bits = 128, quantization=True, nc = 2, num_Blocks = [3,4,23,3]):
         super(Decoder, self).__init__()
         self.in_planes = 512
         self.feedback_bits = feedback_bits
-        self.dequantize = DequantizationLayer(self.B)
         self.quantization = quantization
+        self.dequantize = DequantizationLayer(self.B)
         z_dim = int(feedback_bits / self.B)
 
         self.linear = nn.Linear(z_dim, 1024)
@@ -243,7 +243,7 @@ class Decoder(nn.Module):
             z = self.dequantize(z)
         x = self.linear(z)
         x = x.view(z.size(0), 512, 1, 2)
-        x = F.interpolate(x, scale_factor=4)
+        x = F.interpolate(x, scale_factor=4, recompute_scale_factor = True)
         x = self.layer4(x)
         x = self.layer3(x)
         x = self.layer2(x)
@@ -319,3 +319,10 @@ class DatasetFolder(Dataset):
     
     def __getitem__(self, index):
         return self.matdata[index] #, self.matdata[index]
+
+if __name__ == '__main__':
+    model = AutoEncoder(128)
+    input = torch.randn(1,2,16,32)
+    output = model(input)
+    print(output)
+  
