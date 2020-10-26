@@ -1,4 +1,0 @@
-# NAIC
-Codes for AI wireless communication contest.
-
-初赛代码主要是基于pytorch实现的一个自动编码器，训练所用的损失函数就是简单的mean square loss。我们模型的特点在于采用了resnet的结构，并且根据我们的训练数据特别设计了网络细节。采用resnet的模型是为了拥有更强大的表达能力，从信息论的角度来看，就是用有限多的字节去表达尽可能多的原始数据中的信息，从而让恢复出来的信息尽可能的多。
