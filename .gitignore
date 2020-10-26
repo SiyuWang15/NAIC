@@ -2,7 +2,8 @@
 *pth*
 *.vscode*
 *.mat
-
+*.png
+*.pt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
