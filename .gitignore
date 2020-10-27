@@ -4,6 +4,12 @@
 *.mat
 *.png
 *.pt
+*.csv
+*Pilot*
+
+simulation_code_v1/
+dataset/
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
