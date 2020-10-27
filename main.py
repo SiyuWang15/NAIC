@@ -14,8 +14,8 @@ batch_size = 1024
 val_batch_size = 10000
 lr = 0.02
 
-val_freq = 5
-print_freq = 5
+val_freq = 100
+print_freq = 100
 
 
 

@@ -6,7 +6,7 @@ import struct
 Pilotnums = [32, 8]
 modes = [0,1,2]
 SNRdbs = [8, 9, 10, 11, 12]
-
+H_ind = 0
 
 def get_H(H_path = 'dataset/H.bin', ratio = 0.9):
     data = open(H_path, 'rb')
@@ -27,10 +27,12 @@ def get_data(batch_size, H_stack, device):
             bits0 = np.random.binomial(n=1, p=0.5, size = (128*4, ))
             bits1 = np.random.binomial(n=1, p=0.5, size = (128*4, ))
             X = [bits0, bits1]
-            H_ind = np.random.randint(0, len(H_stack))
+            # H_ind = np.random.randint(0, len(H_stack))
             HH = H_stack[H_ind]
-            mode = np.random.choice(modes, 1)[0]
-            SNRdb = np.random.choice(SNRdbs, 1)[0]
+            mode = 0
+            SNRdb = 12
+            # mode = np.random.choice(modes, 1)[0]
+            # SNRdb = np.random.choice(SNRdbs, 1)[0]
             Pilotnum = np.random.choice(Pilotnums, 1)[0]
             YY = MIMO(X, HH, SNRdb, mode, Pilotnum) / 20
             XX = np.concatenate((bits0, bits1), 0)
@@ -47,10 +49,12 @@ def get_val_data(batch_size, H_stack, device):
         bits0 = np.random.binomial(n=1, p=0.5, size = (128*4, ))
         bits1 = np.random.binomial(n=1, p=0.5, size = (128*4, ))
         X = [bits0, bits1]
-        H_ind = np.random.randint(0, len(H_stack))
+        # H_ind = np.random.randint(0, len(H_stack))
         HH = H_stack[H_ind]
-        mode = np.random.choice(modes, 1)[0]
-        SNRdb = np.random.choice(SNRdbs, 1)[0]
+        mode = 0
+        SNRdbs = 12
+        # mode = np.random.choice(modes, 1)[0]
+        # SNRdb = np.random.choice(SNRdbs, 1)[0]
         Pilotnum = np.random.choice(Pilotnums, 1)[0]
         YY = MIMO(X, HH, SNRdb, mode, Pilotnum) / 20
         XX = np.concatenate((bits0, bits1), 0)
