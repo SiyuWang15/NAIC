@@ -9,7 +9,7 @@
 *.log
 *.npy
 
-
+workspace/
 simulation_code_v1/
 dataset/
 

@@ -3,9 +3,13 @@ import numpy as np
 from numpy import random
 import torch
 import os 
+import shutil
+from datetime import datetime
+
 
 # logging
-def set_logger(log):
+def set_logger(config):
+    log = os.path.join(config.log.log_dir, 'training.log')
     level = getattr(logging, 'INFO', None)
     if not isinstance(level, int):
         raise ValueError('level {} not supported'.format(args.verbose))
