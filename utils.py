@@ -4,9 +4,8 @@ from numpy import random
 import torch
 import os 
 
-log = 'training.log'
 # logging
-def set_logger():
+def set_logger(log):
     level = getattr(logging, 'INFO', None)
     if not isinstance(level, int):
         raise ValueError('level {} not supported'.format(args.verbose))

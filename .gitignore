@@ -1,11 +1,14 @@
 # My own 
 *pth*
-*.vscode*
+*vscode*
 *.mat
 *.png
 *.pt
 *.csv
 *Pilot*
+*.log
+*.npy
+
 
 simulation_code_v1/
 dataset/
