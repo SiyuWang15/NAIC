@@ -3,17 +3,18 @@ OFDM:
   SNRdb: 12
   mode: 0
 log:
-  log_prefix: fix_H
-  print_freq: 1
+  log_prefix: default
+  print_freq: 5
   val_freq: 20
 model:
-  h_dim: 512
-  in_dim: 1024
-  n_blocks: 2
-  out_dim: 128
+  h_dim: [1024, 512, 256]
+  in_dim: 2048
+  n_blocks: -1
+  out_dim: 16
 train:
   batch_size: 1024
   lr: 0.002
   lr_decay: 0
   optimizer: adam
   val_batch_size: 10000
+  n_iters: 10000

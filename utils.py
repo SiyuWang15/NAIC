@@ -31,3 +31,8 @@ def seed_everything(seed=2020):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.backends.cudnn.deterministic = True
+
+def bit_err(x_true, x_prob):
+    x_pred = x_prob > 0.5
+    err = 1 - np.asarray((x_pred == x_true).cpu(), dtype = 'float32').mean()
+    return err
