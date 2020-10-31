@@ -36,7 +36,7 @@ class ComplexMLP(nn.Module):
             hidden_layers.extend(
                 [
                 nn.Linear(h_dim[i], h_dim[i+1]),
-                nn.ReLU()
+                nn.ReLU(), nn.BatchNorm1d(h_dim[i+1])
                 ]
             )
         self.hidden_layers = nn.ModuleList(hidden_layers)

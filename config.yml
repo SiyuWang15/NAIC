@@ -1,6 +1,6 @@
 OFDM:
   Pilotnum: 32
-  SNRdb: 12
+  SNRdb: 25
   mode: 0
 log:
   log_prefix: default

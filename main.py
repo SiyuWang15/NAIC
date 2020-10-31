@@ -14,7 +14,7 @@ def main(config):
     device = 'cuda'
     set_logger(config)
     logging.info(config)
-    description = '''Description: random H, reserve all pilot y, but not pilot x.'''
+    description = '''Description: random H, reserve all pilot y, but not pilot x. '''
     logging.info(description)
     seed_everything()
 
@@ -39,19 +39,19 @@ def main(config):
         optimizer.step()
         
         if it % config.log.print_freq == 0:
-            logging.info('iter: {} || loss: {}, acc: {}'.format(it, loss.cpu().item(), err))
+            logging.info('iter: {} || loss: {}, bit err: {}'.format(it, loss.cpu().item(), err))
         
         if it % config.log.val_freq == 0:
             model.eval()
-            val_y, val_x = get_val_data(config.train.val_batch_size, H_val, device, config)
+            val_y, val_x = get_val_data(config.train.val_batch_size, H_train, device, config)
             # val_y = val_y[:, :, 1, :, :].reshape(-1, 1024)
             pred = model(val_y) 
             loss = nn.MSELoss()(pred, val_x)
             err = bit_err(val_x, pred)
-            logging.info('iter: {}, validation || loss: {}, accuracy: {}'.format(it, loss.cpu().item(), err))
+            logging.info('iter: {}, validation || loss: {}, bit err: {}'.format(it, loss.cpu().item(), err))
             print('----log at {}'.format(config.log.log_dir))
             model.train()
-        if it > config.train.n_iters:
+        if it == config.train.n_iters:
             logging.info('{}-iter training Complete. Log save at {}'.format(it, config.log.log_dir))
 
 

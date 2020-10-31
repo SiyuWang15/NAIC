@@ -142,10 +142,11 @@ def ofdm_simulate(codeword, channelResponse, SNRdb, mu, CP_flag, K, P, CP, pilot
 
 def MIMO(X, HMIMO, SNRdb,flag,P):
     P = P * 2
-    Pilot_file_name = './another_Pilot/Pilot_' + str(P)
+    Pilot_file_name = './dataset/Pilot_' + str(P)
     if os.path.isfile(Pilot_file_name):
         bits = np.loadtxt(Pilot_file_name, delimiter=',')
     else:
+        print('Invalid Pilot file.')
         bits = np.random.binomial(n=1, p=0.5, size=(P * mu,))
         np.savetxt(Pilot_file_name, bits, delimiter=',')
     pilotValue = Modulation(bits, mu)

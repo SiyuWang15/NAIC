@@ -6,13 +6,11 @@ import struct
 Pilotnums = [32, 8]
 modes = [0,1,2]
 SNRdbs = [8, 9, 10, 11, 12]
-# H_ind = 0
+# H_ind = 1
 
-def get_H(H_path = 'dataset/H.npy', ratio = 0.9):
+def get_H(H_path = 'dataset/H_data.npy', ratio = 0.9):
     H = np.load(H_path)
-    H = H[:, 1, :, :] + 1j*H[:, 0, :, :]
-    np.save('dataset/H_data.npy', H)
-    split = int(ratio * 320000)
+    split = int(ratio * len(H))
     H_train = H[:split, :, :]
     H_val = H[split:, :, :]
     return H_train, H_val
