@@ -2,6 +2,9 @@
 *pth*
 *.vscode*
 *.mat
+*Pilot*
+*.npy*
+*.bin*
 
 
 # Byte-compiled / optimized / DLL files
