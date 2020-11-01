@@ -50,7 +50,7 @@ Hf_partial = LS_Estimation(Y,Pilot_num)
 model = FC_Estimation(2048, 4096, 4096, 2048)
 model = torch.nn.DataParallel(model).cuda()  # model.module
 # Load weights
-model_path = './Modelsave/FC_Estimation_for_'+str(Pilot_num)+'.pth.tar'
+model_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/FC_Estimation_for_'+str(Pilot_num)+'.pth.tar'
 model.load_state_dict(torch.load(model_path)['state_dict'])
 print("Weight Loaded!")
 # 通过网络估计全频域信道
