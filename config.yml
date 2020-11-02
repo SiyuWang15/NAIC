@@ -3,8 +3,8 @@ OFDM:
   SNRdb: 25
   mode: 0
 log:
-  log_prefix: default
-  print_freq: 1
+  log_prefix: fixed_X
+  print_freq: 100
   val_freq: 20
   save_freq: 10000
 model:
@@ -17,5 +17,6 @@ train:
   lr: 0.002
   lr_decay: 0
   optimizer: adam
-  val_batch_size: 256
+  random: 0
+  val_batch_size: 1024
   n_epochs: 100

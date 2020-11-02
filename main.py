@@ -9,14 +9,14 @@ from datetime import datetime
 import os
 from DataLoader import get_data
 from models import MLP, ComplexMLP
-from utils import set_logger, seed_everything, bit_err
+from utils import set_logger, seed_everything, bit_err, arg_parser
 
 def main(config):
     device = 'cuda'
     set_logger(config)
     logging.info(config)
-    description = '''Description: random H, load X rather than random X. '''
-    logging.info(description)
+    # description = '''Description:. '''
+    # logging.info(description)
     seed_everything()
 
     model = MLP(config.model.in_dim,  config.model.out_dim, config.model.h_dim, config.model.n_blocks) \
@@ -25,7 +25,7 @@ def main(config):
     optimizer = torch.optim.Adam(model.parameters(), lr=config.train.lr)
 
 
-    train_dataset, val_dataset = get_data()
+    train_dataset, val_dataset = get_data(config.train.random)
     train_dataloader = DataLoader(
         dataset=train_dataset, 
         batch_size=config.train.batch_size,
@@ -36,12 +36,12 @@ def main(config):
     val_dataloader = DataLoader(
         dataset=val_dataset, 
         batch_size=config.train.val_batch_size,
-        shuffle=True,
+        shuffle=False,
         num_workers=8,
         drop_last=True,
         pin_memory=True
     )
-    logging.info('data loader is ready.')
+    logging.info('{} data loader is ready.'.format('random' if config.train.random else 'fixed'))
     model.train()
     for epoch in range(config.train.n_epochs):
         it = 0
@@ -80,6 +80,7 @@ def main(config):
 
 
 if __name__ == "__main__":
+    args = arg_parser()
     config = yaml.load(open('config.yml'))
     for k, v in config.items():
         config[k] = Namespace(**v)
@@ -88,4 +89,5 @@ if __name__ == "__main__":
     config.log.log_dir = os.path.join('workspace', config.log.log_prefix, now.strftime('%H-%M-%S'))
     config.log.ckpt_dir = os.path.join(config.log.log_dir, 'checkpoints')
     os.makedirs(config.log.ckpt_dir)
+    config.slice = args.slice
     main(config)

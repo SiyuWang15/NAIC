@@ -5,6 +5,7 @@ import torch
 import os 
 import shutil
 from datetime import datetime
+import argparse
 
 
 # logging
@@ -36,3 +37,8 @@ def bit_err(x_true, x_prob):
     x_pred = x_prob > 0.5
     err = 1 - np.asarray((x_pred == x_true).cpu(), dtype = 'float32').mean()
     return err
+
+def arg_parser():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--slice', default=0, type = int, help='use which slice of X as label')
+    return parser
