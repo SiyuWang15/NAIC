@@ -1,12 +1,13 @@
 import torch
 import torch.nn as nn
+from torch.utils.data import DataLoader
 import numpy as np
 import yaml
 from argparse import Namespace
 import logging
 from datetime import datetime
 import os
-from data import get_data, get_H, get_val_data
+from DataLoader import get_data
 from models import MLP, ComplexMLP
 from utils import set_logger, seed_everything, bit_err
 
@@ -14,7 +15,7 @@ def main(config):
     device = 'cuda'
     set_logger(config)
     logging.info(config)
-    description = '''Description: random H, reserve all pilot y, but not pilot x. '''
+    description = '''Description: random H, load X rather than random X. '''
     logging.info(description)
     seed_everything()
 
@@ -22,37 +23,60 @@ def main(config):
         if config.model.n_blocks != -1 else ComplexMLP(config.model.in_dim, config.model.out_dim, config.model.h_dim)
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=config.train.lr)
-    
-    H_train, H_val = get_H()
 
-    data = get_data(config.train.batch_size, H_train, device, config)
-    it = 0
+
+    train_dataset, val_dataset = get_data()
+    train_dataloader = DataLoader(
+        dataset=train_dataset, 
+        batch_size=config.train.batch_size,
+        shuffle=False,
+        num_workers=8,
+        drop_last=True,
+        pin_memory=True)
+    val_dataloader = DataLoader(
+        dataset=val_dataset, 
+        batch_size=config.train.val_batch_size,
+        shuffle=True,
+        num_workers=8,
+        drop_last=True,
+        pin_memory=True
+    )
+    logging.info('data loader is ready.')
     model.train()
-    for Y, X in data:
-        it += 1
-        # Y = Y[:, :, 1, :, :].reshape(-1, 1024)
-        pred = model(Y)
-        loss = nn.MSELoss()(pred, X)
-        err = bit_err(X, pred)
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+    for epoch in range(config.train.n_epochs):
+        it = 0
+        model.train()
+        for Y, X in train_dataloader:
+            Y = Y.float().to(device)
+            X = X.float().to(device)
+            it += 1
+            pred = model(Y)
+            loss = nn.BCELoss()(pred, X)
+            err = bit_err(X, pred)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            if it % config.log.print_freq == 0:
+                logging.info('iter/epoch: {}/{} || loss: {}, bit err: {}'.format(it, epoch, loss.cpu().item(), err))
         
-        if it % config.log.print_freq == 0:
-            logging.info('iter: {} || loss: {}, bit err: {}'.format(it, loss.cpu().item(), err))
-        
-        if it % config.log.val_freq == 0:
-            model.eval()
-            val_y, val_x = get_val_data(config.train.val_batch_size, H_train, device, config)
-            # val_y = val_y[:, :, 1, :, :].reshape(-1, 1024)
-            pred = model(val_y) 
-            loss = nn.MSELoss()(pred, val_x)
-            err = bit_err(val_x, pred)
-            logging.info('iter: {}, validation || loss: {}, bit err: {}'.format(it, loss.cpu().item(), err))
-            print('----log at {}'.format(config.log.log_dir))
-            model.train()
-        if it == config.train.n_iters:
-            logging.info('{}-iter training Complete. Log save at {}'.format(it, config.log.log_dir))
+        model.eval()
+        preds = []
+        val_xs = []
+        for val_y, val_x in val_dataloader:
+            val_y = val_y.float().to(device)
+            val_x = val_x.float().to(device)
+            pred = model(val_y)
+            preds.append(pred)
+            val_xs.append(val_x)
+        pred = torch.cat(preds, dim = 0)
+        val_x = torch.cat(val_xs, dim = 0)
+        loss = nn.BCELoss()(pred, val_x)
+        err = bit_err(val_x, pred)
+        logging.info('epoch: {}, validation || loss: {}, bit err: {}'.format(epoch, loss.cpu().item(), err))
+        ckpt_path = os.path.join(config.log.ckpt_dir, '{}.pth'.format(epoch))
+        torch.save(model.state_dict(), ckpt_path)
+        logging.info('checkpoint saved at {}'.format(ckpt_path))
 
 
 if __name__ == "__main__":
@@ -62,5 +86,6 @@ if __name__ == "__main__":
     config = Namespace(**config)
     now = datetime.now()
     config.log.log_dir = os.path.join('workspace', config.log.log_prefix, now.strftime('%H-%M-%S'))
-    os.makedirs(config.log.log_dir)
+    config.log.ckpt_dir = os.path.join(config.log.log_dir, 'checkpoints')
+    os.makedirs(config.log.ckpt_dir)
     main(config)

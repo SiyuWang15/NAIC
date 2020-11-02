@@ -4,8 +4,9 @@ OFDM:
   mode: 0
 log:
   log_prefix: default
-  print_freq: 5
+  print_freq: 1
   val_freq: 20
+  save_freq: 10000
 model:
   h_dim: [1024, 512, 256]
   in_dim: 2048
@@ -16,5 +17,5 @@ train:
   lr: 0.002
   lr_decay: 0
   optimizer: adam
-  val_batch_size: 10000
-  n_iters: 10000
+  val_batch_size: 256
+  n_epochs: 100

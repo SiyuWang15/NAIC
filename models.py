@@ -6,11 +6,12 @@ class MLP(nn.Module):
         super().__init__()
         self.y2h = nn.Sequential(
             nn.Linear(in_dim, h_dim),
-            nn.ReLU()
+            nn.ReLU(),
+            nn.BatchNorm1d(h_dim)
         )
         hidden_layers = []
         for i in range(n_blocks):
-            hidden_layers.extend([nn.Linear(h_dim, h_dim), nn.ReLU()])
+            hidden_layers.extend([nn.Linear(h_dim, h_dim), nn.ReLU(), nn.BatchNorm1d(h_dim)])
         self.hidden_layers = nn.ModuleList(hidden_layers)
         self.h2x = nn.Sequential(
                 nn.Linear(h_dim, out_dim), 
@@ -29,14 +30,16 @@ class ComplexMLP(nn.Module):
         super().__init__()
         self.y2h = nn.Sequential(
             nn.Linear(in_dim, h_dim[0]),
-            nn.ReLU()
+            nn.ReLU(),
+            nn.BatchNorm1d(h_dim[0])
         )
         hidden_layers = []
         for i in range(len(h_dim) - 1):
             hidden_layers.extend(
                 [
                 nn.Linear(h_dim[i], h_dim[i+1]),
-                nn.ReLU(), nn.BatchNorm1d(h_dim[i+1])
+                nn.ReLU(), 
+                nn.BatchNorm1d(h_dim[i+1])
                 ]
             )
         self.hidden_layers = nn.ModuleList(hidden_layers)
