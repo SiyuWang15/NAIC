@@ -8,8 +8,8 @@ import h5py
 from scipy.io import loadmat
 from scipy.io import savemat
 import time
-from Model_define_pytorch import FC_Detection, FC_Estimation, FC_Estimation32, NMSELoss, DatasetFolder, DnCNN
-from LS_CE import LS_Estimation, LS_Estimation32
+from Model_define_pytorch import FC_Detection, FC_Estimation, NMSELoss, DatasetFolder, DnCNN
+from LS_CE import LS_Estimation
 from generate_data import generator,generatorXY
 
 
@@ -30,10 +30,12 @@ seed_everything(SEED)
 
 batch_size = 256
 epochs = 200
-learning_rate = 1e-4  # bigger to train faster
+learning_rate = 1e-3  # bigger to train faster
 num_workers = 4
 print_freq = 20
 val_freq = 100
+# print_freq = 2
+# val_freq = 10
 iterations = 10000
 Pilotnum = 8
 freeze_CE = True
@@ -43,12 +45,12 @@ load_SD = False
 best_accuracy = 0.5
 
 # channel data for training and validation
-data1 = open('H.bin','rb')
+data1 = open('/data/CuiMingyao/AI_competition/OFDMReceiver/H.bin','rb')
 H1 = struct.unpack('f'*2*2*2*32*320000,data1.read(4*2*2*2*32*320000))
 H1 = np.reshape(H1,[320000,2,4,32])
 H_tra = H1[:,1,:,:]+1j*H1[:,0,:,:]   # time-domain channel for training
 
-data2 = open('H_val.bin','rb')
+data2 = open('/data/CuiMingyao/AI_competition/OFDMReceiver/H_val.bin','rb')
 H2 = struct.unpack('f'*2*2*2*32*2000,data2.read(4*2*2*2*32*2000))
 H2 = np.reshape(H2,[2000,2,4,32])
 H_val = H2[:,1,:,:]+1j*H2[:,0,:,:]   # time-domain channel for training
@@ -56,7 +58,9 @@ H_val = H2[:,1,:,:]+1j*H2[:,0,:,:]   # time-domain channel for training
 
 # Model Construction
 CE_model = FC_Estimation(2048, 4096, 4096, 2048)
-SD_model = FC_Detection(3072, 1024, [4096, 4096])
+# 分成16组
+G = 32
+SD_model = FC_Detection(3072, G*2, [4096,4096,4096])
 # model = DnCNN()
 # criterion = NMSELoss(reduction='mean')
 # criterion_test = NMSELoss(reduction='sum')
@@ -82,9 +86,15 @@ if freeze_CE:
     CE_model.eval()
     print('freeze CE!')
 
-if load_CE:
+if load_SD:
     SD_model_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/FC_Detection_for_'+str(Pilotnum)+'.pth.tar'
-    SD_model.load_state_dict(torch.load(SD_model_path)['state_dict'])
+    SD_load_model = torch.load(SD_model_path)['state_dict']
+    SD_model_dict = SD_model.state_dict()
+
+    SD_state_dict = {k:v for k,v in SD_load_model.items() if k in SD_model_dict.keys()}
+
+    SD_model_dict.update(SD_state_dict)
+    SD_model.load_state_dict( SD_model_dict )
     print("SD Weight Loaded!")
 
 optimizer = torch.optim.Adam(SD_model.parameters(), lr=learning_rate)
@@ -96,6 +106,11 @@ test_data = generatorXY(2000, H_val, Pilotnum)
 print('==========Begin Training=========')
 iter = 0
 for Y,X,H in train_data:
+    X_temp = np.reshape(X, (-1, 2,512))
+    X_temp = X_temp[:,:,0:G]
+    X = np.reshape(X_temp, (-1, G*2))
+# for idx in range(iterations):
+    # Y,X,H = train_data
     iter = iter+1
     # Obtain input data based on the LS channel estimation
     Hf_partial = LS_Estimation(Y, Pilotnum)
@@ -122,8 +137,9 @@ for Y,X,H in train_data:
     temp = np.reshape(Y, (-1, 2,2,2, 256), order = 'F') 
     Y_data = np.reshape(temp[:,:,1,:,:], (-1, 1024))
     Y_data = torch.Tensor(Y_data).to('cuda')
+    Hf_hat_train = Hf_hat_train.reshape(-1, 2048)
 
-    SD_input = torch.cat((Y_data, Hf_hat_train), 0)
+    SD_input = torch.cat((Y_data, Hf_hat_train), 1)
     SD_label = torch.Tensor(X).to('cuda')
     SD_output = SD_model(SD_input)
 
@@ -140,6 +156,10 @@ for Y,X,H in train_data:
     if iter % val_freq == 0:
         SD_model.eval()
         Y_test,X_test,H_test = test_data
+        X_temp = np.reshape(X_test, (-1, 2,512))
+        X_temp = X_temp[:,:,0:G]
+        X_test = np.reshape(X_temp, (-1, G*2))
+
         Ns = Y_test.shape[0]
         # Obtain input data based on the LS channel estimation
         Hf_partial = LS_Estimation(Y_test, Pilotnum)
@@ -165,14 +185,15 @@ for Y,X,H in train_data:
         temp = np.reshape(Y_test, (-1, 2,2,2, 256), order = 'F') 
         Y_data_test = np.reshape(temp[:,:,1,:,:], (-1, 1024))
         Y_data_test = torch.Tensor(Y_data_test).to('cuda')
+        Hf_hat_test = Hf_hat_test.reshape(-1, 2048)
 
-        SD_input = torch.cat((Y_data_test, Hf_hat_test), 0)
+        SD_input = torch.cat((Y_data_test, Hf_hat_test), 1)
         SD_output = SD_model(SD_input)
 
         SD_label = torch.Tensor(X_test)
         X_hat_test = (SD_output > 0.5)*1. 
         error = X_hat_test.cpu() - SD_label 
-        accuracy = torch.sum(torch.abs(error)<0.1)/error.numel()
+        accuracy = (torch.sum(torch.abs(error)<0.1)*1.)/(error.numel()*1.)
 
         print('accuracy %.4f' % accuracy)
         if accuracy > best_accuracy:

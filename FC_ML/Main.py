@@ -11,18 +11,19 @@ from Model_define_pytorch import FC_Estimation, NMSELoss, DatasetFolder
 from LS_CE import LS_Estimation,MMSE_Estimation, Interpolation_f
 
 from MLreceiver import MLReceiver, MakeCodebook
+from SoftMLreceiver import SoftMLReceiver
 from generate_data import generatorXY
 
 # Parameters for training
 gpu_list = '4,5,6,7'
 os.environ["CUDA_VISIBLE_DEVICES"] = gpu_list
 
-data1=open('H.bin','rb')
+data1=open('/data/CuiMingyao/AI_competition/OFDMReceiver/H.bin','rb')
 H1=struct.unpack('f'*2*2*2*32*320000,data1.read(4*2*2*2*32*320000))
 H1=np.reshape(H1,[320000,2,4,32])
 H = H1[:,1,:,:]+1j*H1[:,0,:,:]
 
-data2 = open('H_val.bin','rb')
+data2 = open('/data/CuiMingyao/AI_competition/OFDMReceiver/H_val.bin','rb')
 H2 = struct.unpack('f'*2*2*2*32*2000,data2.read(4*2*2*2*32*2000))
 H2 = np.reshape(H2,[2000,2,4,32])
 H_val = H2[:,1,:,:]+1j*H2[:,0,:,:]
@@ -97,6 +98,7 @@ codebook = MakeCodebook(G)
 
 # X_ML1, X_bits1 = MLReceiver(Y,Hf,codebook)
 X_ML2, X_bits2 = MLReceiver(Y,Hf_hat,codebook)
+# X_ML2, X_bits2 = SoftMLReceiver(Y,Hf_hat)
 
 # 可用的复数input：样本数 * 发射天线数 * 子载波数
 X1 = np.reshape(X, (-1, 2, 512))

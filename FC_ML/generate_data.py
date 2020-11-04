@@ -14,6 +14,7 @@ def generator(batch,H,Pilotnum):
             HH = H[temp]
             SNRdb = np.random.uniform(8, 12)
             mode = np.random.randint(0, 3)
+            # mode = 0
             YY = MIMO(X, HH, SNRdb, mode,Pilotnum)/20 ###
             XX = np.concatenate((bits0, bits1), 0)
             input_labels.append(XX)
@@ -38,9 +39,10 @@ def generatorXY(batch, H, Pilotnum):
         temp = row
         HH = H[temp]
         SNRdb = np.random.uniform(8, 12)
+        # SNRdb = 10
         mode = np.random.randint(0, 3)
-        # print(mode)
-        # mode=0
+        # mode = 0
+        # mode = 2
         YY = MIMO(X, HH, SNRdb, mode, Pilotnum) / 20  ###
         XX = np.concatenate((bits0, bits1), 0)
         input_labels.append(XX)

@@ -5,6 +5,37 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset
 from collections import OrderedDict
 
+class BasicBlock():
+    def __init__(self, in_dim, out_dim, hidden_dim):
+        super(BasicBlock, self).__init__()
+        self.in_dim = in_dim
+        self.out_dim = out_dim
+        self.hidden_dim = hidden_dim
+
+        self.fc1 = nn.Sequential(
+            nn.BatchNorm1d(in_dim),
+            nn.Linear(in_dim, self.hidden_dim[0]),
+            nn.BatchNorm1d(self.hidden_dim[0]),
+            nn.ReLU(inplace=True))
+
+        self.hidden_layer = nn.Sequential()
+
+        for idx in range(len(self.hidden_dim)-1):
+            self.hidden_layer.add_module('fc{0}'.format(idx), nn.Linear(self.hidden_dim[idx], self.hidden_dim[idx+1]))
+            self.hidden_layer.add_module('bn{0}'.format(idx), nn.BatchNorm1d(self.hidden_dim[idx+1]))
+            self.hidden_layer.add_module('relu{0}'.format(idx), nn.ReLU(inplace=True))
+
+        self.output = nn.Linear(self.hidden_dim[-1], out_dim)
+    
+    def forward(self, x):
+        x = x.view(-1, self.in_dim)
+        x = self.fc1(x)
+        x = self.hidden_layer(x)
+        x = self.output(x)
+        x = torch.sigmoid(x)        
+        return x
+
+
 
 class FC_Detection(nn.Module):
     def __init__(self, in_dim, out_dim, hidden_dim):
@@ -26,7 +57,7 @@ class FC_Detection(nn.Module):
             self.hidden_layer.add_module('bn{0}'.format(idx), nn.BatchNorm1d(self.hidden_dim[idx+1]))
             self.hidden_layer.add_module('relu{0}'.format(idx), nn.ReLU(inplace=True))
 
-        self.fc3 = nn.Linear(self.hidden_dim[-1], out_dim)
+        self.output = nn.Linear(self.hidden_dim[-1], out_dim)
     
         
 
@@ -34,7 +65,7 @@ class FC_Detection(nn.Module):
         x = x.view(-1, self.in_dim)
         x = self.fc1(x)
         x = self.hidden_layer(x)
-        x = self.fc3(x)
+        x = self.output(x)
         x = torch.sigmoid(x)        
         return x
 

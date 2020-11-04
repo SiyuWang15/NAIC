@@ -115,6 +115,7 @@ def ofdm_simulate(codeword, channelResponse, SNRdb, mu, CP_flag, K, P, CP, pilot
     OFDM_RX = channel(OFDM_TX, channelResponse, SNRdb)
     OFDM_RX_noCP = removeCP(OFDM_RX, CP,  K)
     OFDM_RX_noCP = np.fft.fft(OFDM_RX_noCP)
+
     # OFDM_RX_noCP = removeCP(OFDM_RX)
     # ----- target inputs ---
     symbol = np.zeros(K, dtype=complex)
@@ -143,11 +144,10 @@ def ofdm_simulate(codeword, channelResponse, SNRdb, mu, CP_flag, K, P, CP, pilot
 def MIMO(X, HMIMO, SNRdb,flag,P):
     P = P * 2
     Pilot_file_name = 'Pilot_' + str(P)
-    if os.path.isfile(Pilot_file_name):
-        bits = np.loadtxt(Pilot_file_name, delimiter=',')
-    else:
-        bits = np.random.binomial(n=1, p=0.5, size=(P * mu,))
-        np.savetxt(Pilot_file_name, bits, delimiter=',')
+    bits = np.loadtxt(Pilot_file_name, delimiter=',')
+    # bits = np.random.binomial(n=1, p=0.5, size=(P * mu,))
+    # np.savetxt(Pilot_file_name, bits, delimiter=',')
+    # print('你没了！')
     pilotValue = Modulation(bits, mu)
 
 

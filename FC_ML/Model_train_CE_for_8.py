@@ -139,6 +139,8 @@ for Y,X,H in train_data:
             #     torch.save({'state_dict': model.module.state_dict(), }, modelSave,_use_new_zipfile_serialization=False)
             print('Model saved!')
             best_loss = average_loss
+        
+        model.train()
 
     if iter>iterations:
         break
