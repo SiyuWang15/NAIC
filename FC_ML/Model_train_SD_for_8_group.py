@@ -70,7 +70,7 @@ H_val = H2[:,1,:,:]+1j*H2[:,0,:,:]   # time-domain channel for training
 CE_model = FC_Estimation(2048, 4096, 4096, 2048)
 # 分成16组
 G = 256 // group_num
-SD_model = FC_Detection(G*(4+8),  G*4, [512,512,1024,1024,512,512])
+SD_model = FC_Detection(G*(4+8),  G*4, [512,1024,2048,2048,1024,512])
 # model = DnCNN()
 # criterion = NMSELoss(reduction='mean')
 # criterion_test = NMSELoss(reduction='sum')
