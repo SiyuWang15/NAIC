@@ -1,1 +1,1 @@
-CUDA_VISIBLE_DEVICES=0 python main.py --slice 0
+CUDA_VISIBLE_DEVICES=0 python main.py --slice 0 & CUDA_VISIBLE_DEVICES=1 python main.py --slice 1

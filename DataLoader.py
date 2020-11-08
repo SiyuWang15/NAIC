@@ -4,11 +4,12 @@ from torch.utils.data import Dataset, DataLoader
 from H_utils import *
 
 class dataset(Dataset):
-    def __init__(self, X, H):
+    def __init__(self, X, H, x_part, x_dim):
         super().__init__()
         assert len(X) == len(H)
         self.X = X
         self.H = H
+        self.x_part = x_part
 
     def __len__(self):
         return len(self.X)
@@ -18,7 +19,7 @@ class dataset(Dataset):
         HH = self.H[index]
         temp_X = [XX[:512], XX[512:]]
         YY = MIMO(temp_X, HH, 12, 0, 32) / 20
-        return YY, XX[:16]
+        return YY, XX[x_dim * x_part:x_dim * (x_part+1)]
 
 class RandomDataset(Dataset):
     def __init__(self, H):
@@ -36,21 +37,21 @@ class RandomDataset(Dataset):
     def __len__(self):
         return len(self.H)
         
-def get_data(random = False):
+def get_data(random = False, x_part, x_dim):
     H = np.load('./dataset/H_data.npy')
     split = int(0.9*len(H))
     H_train = H[:split, :, :]
     H_val = H[split:, :, :]
 
     if random:
-        train_set = RandomDataset(H_train)
-        val_set = RandomDataset(H_val)
+        train_set = RandomDataset(H_train, x_part, x_dim)
+        val_set = RandomDataset(H_val, x_part, x_dim)
     else:
         X = np.load('./dataset/X_bin.npy')
         X_train = X[:split, :]
         X_val = X[split:, :]
-        train_set = dataset(X_train, H_train)
-        val_set = dataset(X_val, H_val)
+        train_set = dataset(X_train, H_train, x_part, x_dim)
+        val_set = dataset(X_val, H_val, x_part, x_dim)
     return train_set, val_set
         
 # if __name__ == "__main__":

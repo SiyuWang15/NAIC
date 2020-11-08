@@ -24,8 +24,7 @@ def main(config):
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=config.train.lr)
 
-
-    train_dataset, val_dataset = get_data(config.train.random)
+    train_dataset, val_dataset = get_data(config.train.random, config.slice, config.model.out_dim)
     train_dataloader = DataLoader(
         dataset=train_dataset, 
         batch_size=config.train.batch_size,
