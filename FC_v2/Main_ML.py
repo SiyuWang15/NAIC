@@ -28,7 +28,7 @@ H2 = struct.unpack('f'*2*2*2*32*2000,data2.read(4*2*2*2*32*2000))
 H2 = np.reshape(H2,[2000,2,4,32])
 H_val = H2[:,1,:,:]+1j*H2[:,0,:,:]
 
-Pilot_num = 8
+Pilotnum = 8
 batch_num = 2000
 group_index = list(range(32))
 group_num = 32
@@ -37,7 +37,7 @@ N_train_groups = len(group_index)
 
 
 # 生成测试数据 Y：-1*2048； X：-1*1024； H：-1*4*32 时域信道
-Y, X, H = generatorXY(batch_num,H_val,Pilot_num)
+Y, X, H = generatorXY(batch_num,H_val,Pilotnum)
 
 
 # 完美的频域信道
@@ -45,18 +45,23 @@ Hf = np.fft.fft(H, 256)/20
 Hf = np.reshape(Hf, (-1, 2,2,256), order='F')
 
 # 基于LS估计导频位置上的频域信道
-Hf_partial = LS_Estimation(Y,Pilot_num)
-# Hf_partial = MMSE_Estimation(Y,Pilot_num)
+Hf_partial = LS_Estimation(Y,Pilotnum)
+# Hf_partial = MMSE_Estimation(Y,Pilotnum)
 
 
 #### 通过部分频域信道估计全频域信道 ####
 
 #### The first method
 # Model Construction
-model = FC_Estimation(2048, 4096, 4096, 2048)
+in_dim = 2048
+h_dim = 4096
+out_dim = 2048
+n_blocks =  2
+model = FC_Estimation(in_dim, h_dim, out_dim, n_blocks)
+
 model = torch.nn.DataParallel(model).cuda()  # model.module
 # Load weights
-model_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/FC_Estimation_for_'+str(Pilot_num)+'.pth.tar'
+model_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/FC_Estimation'+ '_f2f_' +'Pilot'+str(Pilotnum)+'_'+ str(in_dim) +'_'+ str(h_dim) +'_'+ str(out_dim) +'_'+ str(n_blocks) + '.pth.tar'
 model.load_state_dict(torch.load(model_path)['state_dict'])
 print("Weight Loaded!")
 # 通过网络估计全频域信道

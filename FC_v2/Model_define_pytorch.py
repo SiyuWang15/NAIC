@@ -43,8 +43,8 @@ class FC_Detection(nn.Module):
 
         for idx in range(len(self.hidden_dim)-1):
             self.hidden_layer.add_module('fc{0}'.format(idx), nn.Linear(self.hidden_dim[idx], self.hidden_dim[idx+1]))
-            # self.hidden_layer.add_module('bn{0}'.format(idx), nn.BatchNorm1d(self.hidden_dim[idx+1]))
-            self.hidden_layer.add_module('dropout{0}'.format(idx), nn.Dropout( p = 0.5 ))
+            self.hidden_layer.add_module('bn{0}'.format(idx), nn.BatchNorm1d(self.hidden_dim[idx+1]))
+            # self.hidden_layer.add_module('dropout{0}'.format(idx), nn.Dropout( p = 0.5 ))
             self.hidden_layer.add_module('relu{0}'.format(idx), nn.ReLU(inplace=True))
 
         self.output = nn.Linear(self.hidden_dim[-1], out_dim)
@@ -59,8 +59,39 @@ class FC_Detection(nn.Module):
         x = torch.sigmoid(x)        
         return x
 
+class FC_Estimation(nn.Module):
+    def __init__(self, in_dim, h_dim, out_dim,n_blocks):
+        super(FC_Estimation, self).__init__()
+        self.input_dim = in_dim
+        self.output_dim = out_dim
+        self.input_layer = nn.Sequential(
+            nn.Linear(in_dim, h_dim),
+            # nn.ReLU(inplace=True),
+            nn.ELU(inplace=True),
+            # nn.Sigmoid(),
+            # nn.BatchNorm1d(h_dim)
+            nn.Dropout(p=0.5)
+        )
+        hidden_layers = []
+        for i in range(n_blocks):
+            # hidden_layers.extend([nn.Linear(h_dim, h_dim), nn.ReLU(inplace=True),  nn.Dropout(p=0.5)]) 
+            # # nn.BatchNorm1d(h_dim), nn.Dropout(p=0.5)
+            hidden_layers.extend([nn.Linear(h_dim, h_dim), nn.ELU(inplace=True),  nn.Dropout(p=0.5)]) 
+        self.hidden_layers = nn.ModuleList(hidden_layers)
+        self.output_layer = nn.Linear(h_dim, out_dim)
 
 
+    def forward(self, x):
+        # x = x.view(-1, self.input_dim)
+        x = self.input_layer(x)
+        for layer in self.hidden_layers:
+            x = layer(x)
+        x = self.output_layer(x)
+
+        return x
+
+
+'''
 class FC_Estimation(nn.Module):
     def __init__(self, in_dim, n_hidden_1, nhidden_2, out_dim):
         super(FC_Estimation, self).__init__()
@@ -88,7 +119,7 @@ class FC_Estimation(nn.Module):
         x = x.view(-1,2,2,2,256)
         return x
 
-
+'''
 
 
 class FC_Estimation32to32(nn.Module):
@@ -190,9 +221,23 @@ class DnCNN(nn.Module):
         x = x.view(-1,2,2,2,256)
         return x
 
+def NMSE_cuda(x_hat, x):
+    power = torch.sum(x**2)
+    mse = torch.sum((x_hat - x)**2)
+    nmse = mse/power
+    return nmse
 
 
+class NMSELoss(nn.Module):
+    def __init__(self):
+        super(NMSELoss, self).__init__()
 
+    def forward(self, x_hat, x):
+        nmse = NMSE_cuda(x_hat, x)
+
+        return nmse
+
+'''
 def NMSE_cuda(x_hat, x):
     x_real = x[:, 0, :, :].view(len(x),-1)
     x_imag = x[:, 1, :, :].view(len(x),-1)
@@ -216,7 +261,7 @@ class NMSELoss(nn.Module):
         else:
             nmse = torch.sum(nmse)
         return nmse
-
+'''
 # class NMSELoss(nn.Module):
 #     def __init__(self, reduction='sum'):
 #         super(NMSELoss, self).__init__()
@@ -249,10 +294,13 @@ class DatasetFolder(Dataset):
 
 if __name__ == '__main__':
 
-    input = torch.randn(100, 2048+1024)
+    input = torch.randn(256, 1024)
 
-    model = FC_Detection(2048 + 1024, 1024, [4096,4096,4096])
-
+    in_dim = 1024
+    h_dim = 4096
+    out_dim = 256
+    n_blocks =  2
+    model = FC_Estimation(in_dim, h_dim, out_dim, n_blocks)
     output = model(input)
 
     print('Lovelive')

@@ -14,12 +14,12 @@ from LS_CE import LS_Estimation
 from generate_data import generator,generatorXY
 import argparse
 import itertools
-
 parser = argparse.ArgumentParser()
 parser.add_argument('--group_index', type = int, nargs='+', default = [0,1,2,3], help = 'input group index')
 parser.add_argument('--load_SD', type = bool, default = False)
 parser.add_argument('--gpu_list',  type = str,  default='4,5,6,7', help='input gpu list')
 args = parser.parse_args()
+
 group_index = args.group_index
 print('group indx:',group_index)
 # Parameters for training
@@ -68,7 +68,13 @@ H_val = H2[:,1,:,:]+1j*H2[:,0,:,:]   # time-domain channel for training
 
 
 # Model Construction
-CE_model = FC_Estimation(2048, 4096, 4096, 2048)
+in_dim = 2048
+h_dim = 4096
+out_dim = 2048
+n_blocks =  2
+CE_model = FC_Estimation(in_dim, h_dim, out_dim, n_blocks)
+
+
 # 分成16组
 G = 256 // group_num
 N_train_groups = len(group_index)
@@ -79,6 +85,8 @@ for idx in range(N_train_groups):
 # model = DnCNN()
 # criterion = NMSELoss(reduction='mean')
 # criterion_test = NMSELoss(reduction='sum')
+CE_criterion = NMSELoss(reduction='mean')
+CE_criterion_test = NMSELoss(reduction='sum')
 criterion =  torch.nn.BCELoss(weight=None, reduction='mean')
 
 
@@ -93,7 +101,7 @@ else:
 
 
 if load_CE:
-    CE_model_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/FC_Estimation_for_'+str(Pilotnum)+'.pth.tar'
+    CE_model_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/FC_Estimation'+ '_f2f_' +'Pilot'+str(Pilotnum)+'_'+ str(in_dim) +'_'+ str(h_dim) +'_'+ str(out_dim) +'_'+ str(n_blocks) + '.pth.tar'
     CE_model.load_state_dict(torch.load(CE_model_path)['state_dict'])
     print("CE Weight Loaded!")
 

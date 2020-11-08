@@ -1,7 +1,7 @@
 from utils import *
 
 ####################使用链路和信道数据产生训练数据##########
-def generator(batch,H,Pilotnum):
+def generator(batch,H,Pilotnum,m = -1):
     while True:
         input_labels = []
         input_samples = []
@@ -12,9 +12,12 @@ def generator(batch,H,Pilotnum):
             X=[bits0, bits1]
             temp = np.random.randint(0, len(H))
             HH = H[temp]
-            SNRdb = 20 + np.random.uniform(8, 12)
-            mode = np.random.randint(0, 3)
-            # mode = 0
+            SNRdb = 10 + np.random.uniform(8, 12)
+            if m == -1:
+                mode = np.random.randint(0, 3)
+            else:
+                mode = m
+
             YY = MIMO(X, HH, SNRdb, mode,Pilotnum)/20 ###
             XX = np.concatenate((bits0, bits1), 0)
             input_labels.append(XX)
@@ -26,7 +29,7 @@ def generator(batch,H,Pilotnum):
         yield (batch_y, batch_x, batch_h)
 
 ########产生测评数据，仅供参考格式##########
-def generatorXY(batch, H, Pilotnum):
+def generatorXY(batch, H, Pilotnum, m =-1):
     input_labels = []
     input_samples = []
     input_channels = []
@@ -38,11 +41,13 @@ def generatorXY(batch, H, Pilotnum):
         # temp = np.random.randint(0, len(H))
         temp = row
         HH = H[temp]
-        SNRdb = 20 + np.random.uniform(8, 12)
+        SNRdb = 10 + np.random.uniform(8, 12)
         # SNRdb = 10
-        mode = np.random.randint(0, 3)
-        # mode = 0
-        # mode = 2
+        if m == -1:
+            mode = np.random.randint(0, 3)
+        else:
+            mode = m
+
         YY = MIMO(X, HH, SNRdb, mode, Pilotnum) / 20  ###
         XX = np.concatenate((bits0, bits1), 0)
         input_labels.append(XX)
