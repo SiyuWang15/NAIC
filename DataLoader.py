@@ -52,7 +52,19 @@ class Yp2modeDataset(Dataset):
         Yp = d[0]
         mode = d[1]
         return Yp, mode
-        
+    
+class YHDataset(Dataset):
+    def __init__(self, YH):
+        self.YH = YH
+    
+    def __len__(self):
+        return len(self.YH)
+    
+    def __getitem__(self, index):
+        d = self.YH[index]
+        Y = d[0]
+        H = d[1]
+        return Y, H
         
 def make_data():
     H = np.load('./dataset/H_data.npy')
@@ -63,17 +75,17 @@ def make_data():
         SNRdb = random.randint(8, 12)
         bits0 = np.random.binomial(1, 0.5, size=(128*4, ))
         bits1 = np.random.binomial(1, 0.5, size=(128*4, ))
-        YY = MIMO([bits0, bits1], HH, SNRdb, mode, 32)
+        YY = MIMO([bits0, bits1], HH, SNRdb, mode, 8)
         YY = np.reshape(YY, [2, 2, 2, 256], order='F')
         Yp = YY[:, 0, :, :].reshape(1024, order = 'F')
         Yp2mode.append((Yp, mode))
         if i % 10000 == 0:
             print('%d complete.' % i)
     
-    np.save('./dataset/random_mode/Yp2mode_Pilot32.npy', Yp2mode, allow_pickle=True)
+    np.save('/data/siyu/NAIC/dataset/random_mode/Yp2mode_Pilot8.npy', Yp2mode, allow_pickle=True)
 
 def get_Yp_modes():
-    Yp = np.load('/data/siyu/NAIC/dataset/random_mode/Yp2mode_Pilot32.npy', allow_pickle=True)
+    Yp = np.load('/data/siyu/NAIC/dataset/random_mode/Yp2mode_Pilot8.npy', allow_pickle=True)
     split = int(len(Yp) * 0.9)
     train = Yp[:split]
     val = Yp[split:]
