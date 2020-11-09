@@ -2,8 +2,10 @@ import numpy as np
 import random
 import torch
 from torch.utils.data import Dataset
-from H_utils import *
 import os 
+import struct
+
+from .Communication import *
 
 dataset_prefix = '/data/siyu/NAIC/'
 
@@ -115,3 +117,40 @@ def get_YX_data( x_part, x_dim, random = False):
         val_set = dataset(X_val, H_val, x_part, x_dim)
     return train_set, val_set
         
+def get_test_data(Pn):
+    tag = 1 if Pn == 32 else 2
+    dp = os.path.join(dataset_prefix, f'dataset/Y_{tag}.csv')
+    Y = np.loadtxt(dp, dtype = np.str, delimiter=',')
+    Y = Y.astype(np.float32)
+    Y = np.reshape(Y, (-1, 2, 2, 2, 256), order = 'F')
+    Yp = Y[:, :, 0, :, :].reshape([:, 1024], order = 'F')
+    Yd = Y[:, :, 1, :, :].reshape([:, 1024], order = 'F')
+    return Yp, Yd
+
+def get_val_data(Pn): # generate validation dataset based on H_val.bin
+    H_path = os.path.join(data_prefix, 'dataset/H_val.bin')
+    H_data = open(H_path, 'rb')
+    H = struct.unpack('f'*2*2*2*32*320000, H_data.read(4*2*2*2*32*320000))
+    H = H.reshape([320000, 2, 4, 32]).astype('float32')
+    H = H[:, 1, :, :] + 1j*H[:, 0, :, :]
+    X = []
+    Yp = []
+    Yd = []
+    for i in range(len(H)):
+        SNRdb = random.randint(8, 12)
+        mode = random.randint(0, 2)
+        bits0 = np.random.binomial(1, 0.5, size = (128*4, ))
+        bits1 = np.random.binomial(1, 0.5, size = (128*4, ))
+        HH = H[i, :, :]
+        YY = MIMO([bits0, bits1], HH, SNRdb, mode, Pn) / 20
+        YY = np.reshape(YY,  [2, 2, 2, 256], order = 'F')
+        YYp = YY[:, 0, :, :].reshape(1024, order = 'F')
+        YYd = YY[:, 1, :, :].reshape(1024, order = 'F')
+        XX = np.concatenate([bits0, bits1], 0)
+        X.append(XX)
+        Yp.append(YYp)
+        Yd.append(YYd)
+    Yp = np.stack(Yp, axis=0).astype('float32')
+    Yd = np.stack(Yd, axis=0).astype('float32')
+    X = np.stack(X, axis=0).astype('float32')
+    return Yp, Yd,  X, H

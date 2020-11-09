@@ -1,7 +1,7 @@
 OFDM:
-  Pilotnum: 32
+  Pilotnum: 8
   SNRdb: -1  # -1 mean random SNR
-  mode: 1
+  mode: 2
 log:
   print_freq: 100
   val_freq: 1

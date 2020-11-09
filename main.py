@@ -10,7 +10,7 @@ from runners import Y2HRunner, Y2XRunner, Y2ModeRunner
 def run_y2h():
     config = get_config('./configs/y2h_config.yml')
     now = datetime.now()
-    config.log.log_prefix = 'mode_{}_Pn_{}'.format(config.OFDM.mode, config.OFDM.Pilotnum)
+    config.log.log_prefix = 'Y2HEstimator/mode_{}_Pn_{}'.format(config.OFDM.mode, config.OFDM.Pilotnum)
     config.log.log_dir = os.path.join('workspace', config.log.log_prefix, now.strftime('%H-%M-%S'))
     config.log.ckpt_dir = os.path.join(config.log.log_dir, 'checkpoints')
     os.makedirs(config.log.ckpt_dir)
