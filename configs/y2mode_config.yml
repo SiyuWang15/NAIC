@@ -1,11 +1,11 @@
 OFDM:
-  Pilotnum: 32
+  Pilotnum: 8
   SNRdb: -1  # -1 mean random SNR
   mode: 0
 log:
-  print_freq: 100
-  val_freq: 20
-  save_freq: 10000
+  print_freq: 500
+  val_freq: 1
+  save_freq: 1
 model:
   h_dims: [512, 512, 256]
   in_dim: 1024

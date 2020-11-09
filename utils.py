@@ -3,9 +3,11 @@ import numpy as np
 from numpy import random
 import torch
 import os 
+import yaml
 import shutil
 from datetime import datetime
 import argparse
+
 
 
 # logging
@@ -42,3 +44,10 @@ def arg_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument('--slice', default=0, type = int, help='use which slice of X as label')
     return parser
+
+def get_config(fp):
+    config = yaml.load(open(fp))
+    for k, v in config.items():
+        config[k] = argparse.Namespace(**v)
+    config = argparse.Namespace(**config)
+    return config

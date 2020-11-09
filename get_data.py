@@ -1,9 +1,11 @@
 import numpy as np 
 import random
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 from H_utils import *
-import scipy.io as scio
+import os 
+
+dataset_prefix = '/data/siyu/NAIC/'
 
 class dataset(Dataset):
     def __init__(self, X, H, x_part, x_dim):
@@ -20,7 +22,7 @@ class dataset(Dataset):
         XX = self.X[index].astype('float')
         HH = self.H[index]
         temp_X = [XX[:512], XX[512:]]
-        YY = MIMO(temp_X, HH, 12, 0, 32) / 20
+        YY = MIMO(temp_X, HH, 12, 0, 32) / 20.
         return YY, XX[x_dim * x_part:x_dim * (x_part+1)]
 
 class RandomDataset(Dataset):
@@ -32,7 +34,7 @@ class RandomDataset(Dataset):
         HH = self.H[index]
         bits0 = np.random.binomial(1, 0.5, size = (128*4, ))
         bits1 = np.random.binomial(1, 0.5, size = (128*4, ))
-        YY = MIMO([bits0, bits1], HH, 12, 0, 32) / 20
+        YY = MIMO([bits0, bits1], HH, 12, 0, 32) / 20.
         XX = np.concatenate([bits0, bits1], 0)[:16]
         return YY, XX
     
@@ -54,38 +56,21 @@ class Yp2modeDataset(Dataset):
         return Yp, mode
     
 class YHDataset(Dataset):
-    def __init__(self, YH):
-        self.YH = YH
+    def __init__(self, Y, H):
+        self.Y = Y
+        self.H = H
     
     def __len__(self):
-        return len(self.YH)
+        return len(self.Y)
     
     def __getitem__(self, index):
-        d = self.YH[index]
-        Y = d[0]
-        H = d[1]
-        return Y, H
-        
-def make_data():
-    H = np.load('./dataset/H_data.npy')
-    Yp2mode = []
-    for i in range(len(H)):
-        HH = H[i, :, :]
-        mode = random.randint(0, 2)
-        SNRdb = random.randint(8, 12)
-        bits0 = np.random.binomial(1, 0.5, size=(128*4, ))
-        bits1 = np.random.binomial(1, 0.5, size=(128*4, ))
-        YY = MIMO([bits0, bits1], HH, SNRdb, mode, 8)
-        YY = np.reshape(YY, [2, 2, 2, 256], order='F')
-        Yp = YY[:, 0, :, :].reshape(1024, order = 'F')
-        Yp2mode.append((Yp, mode))
-        if i % 10000 == 0:
-            print('%d complete.' % i)
-    
-    np.save('/data/siyu/NAIC/dataset/random_mode/Yp2mode_Pilot8.npy', Yp2mode, allow_pickle=True)
+        YY = self.Y[index]
+        HH = self.H[index]
+        return YY, HH
 
-def get_Yp_modes():
-    Yp = np.load('/data/siyu/NAIC/dataset/random_mode/Yp2mode_Pilot8.npy', allow_pickle=True)
+def get_Yp_modes(Pn):
+    data_path = os.path.join(dataset_prefix, 'dataset/random_mode/Yp2mode_Pilot{}.npy'.format(Pn))
+    Yp = np.load(data_path, allow_pickle=True)
     split = int(len(Yp) * 0.9)
     train = Yp[:split]
     val = Yp[split:]
@@ -93,7 +78,27 @@ def get_Yp_modes():
     val_set = Yp2modeDataset(val)
     return train_set, val_set
 
-def get_data( x_part, x_dim, random = False):
+def get_YH_data(mode, Pilotnum, H_domain = 'time'):
+    # H: 32w x 4 x 256  complex number
+    Yp_path = os.path.join(dataset_prefix, 'dataset/YHdata2/mode_{}_P_{}.npy'.format(mode, Pilotnum))
+    H_path = os.path.join(dataset_prefix, 'dataset/YHdata/H_data.npy')
+    Yp = np.load(Yp_path)
+    H = np.load(H_path) # Nsx4x32 complex 
+    H_real = np.real(H)
+    H_imag = np.imag(H)
+    H = np.stack([H_imag, H_real], axis=1)
+    H = H.reshape(len(H), -1) # Ns * 256
+    assert len(Yp) == len(H)
+    split = int(len(H) * 0.9)
+    H_train = H[:split, :]
+    H_val = H[split:, :]
+    Yp_train = H[:split, :]
+    Yp_val = H[split:, :]
+    train_set = YHDataset(Yp_train, H_train)
+    val_set = YHDataset(Yp_val, H_val)
+    return train_set, val_set
+    
+def get_YX_data( x_part, x_dim, random = False):
     H = np.load('./dataset/H_data.npy')
     split = int(0.9*len(H))
     H_train = H[:split, :, :]
@@ -110,10 +115,3 @@ def get_data( x_part, x_dim, random = False):
         val_set = dataset(X_val, H_val, x_part, x_dim)
     return train_set, val_set
         
-if __name__ == "__main__":
-    # H = np.load('./dataset/H_data.npy')
-    # X = np.load('./dataset/X_bin.npy')
-    # np.save('./dataset/H_part.npy', H[:10000, :, :])
-    # np.save('./dataset/X_part.npy', X[:10000, :])
-    make_data()
-    # get_Yp_modes()
