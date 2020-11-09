@@ -7,7 +7,7 @@ import sys
 import os 
 sys.path.append('..')
 from Estimators import ModeEstimator
-from get_data import get_Yp_modes
+from data import get_Yp_modes
 
 class Y2ModeRunner():
     def __init__(self, config):

@@ -2,8 +2,11 @@ import numpy as np
 import random
 from H_utils import *
 
+data_prefix = '/data/siyu/NAIC'
+H_path = os.path.join(data_prefix, 'dataset/H_data.npy')
+
 def make_Ypmode_data():
-    H = np.load('./dataset/H_data.npy')
+    H = np.load(H_path) # Nsx4x32 complex numbers 
     Yp2mode = []
     for i in range(len(H)):
         HH = H[i, :, :]
@@ -18,10 +21,10 @@ def make_Ypmode_data():
         if i % 10000 == 0:
             print('%d complete.' % i)
     
-    np.save('./dataset/random_mode/Yp2mode_Pilot32.npy', Yp2mode, allow_pickle=True)
+    np.save(os.path.join(data_prefix, 'dataset/random_mode/Yp2mode_Pilot32.npy', Yp2mode, allow_pickle=True)
 
 def make_YH_data():
-    H = np.load('./dataset/H_data.npy')
+    H = np.load(H_path)
     Pilotnum = 32
     Yp_modes = [[], [], []]
     for i in range(len(H)):
@@ -48,7 +51,7 @@ def make_YH_data():
         if i % 10000 == 0:
             print('%d complete.' % i)
     for mode in [0, 1, 2]:
-        np.save('./dataset/YHdata/Yp_mode_{}_P_{}.npy'.format(mode, Pilotnum), Yp_modes[mode])
+        np.save(os.path.join(data_prefix, 'dataset/YHdata/Yp_mode_{}_P_{}.npy'.format(mode, Pilotnum), Yp_modes[mode]))
 
 if __name__ == "__main__":
     make_YH_data()

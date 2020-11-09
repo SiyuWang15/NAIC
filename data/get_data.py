@@ -99,7 +99,7 @@ def get_YH_data(mode, Pilotnum, H_domain = 'time'):
     return train_set, val_set
     
 def get_YX_data( x_part, x_dim, random = False):
-    H = np.load('./dataset/H_data.npy')
+    H = np.load(os.path.join(dataset_prefix, 'dataset/H_data.npy'))
     split = int(0.9*len(H))
     H_train = H[:split, :, :]
     H_val = H[split:, :, :]
@@ -108,7 +108,7 @@ def get_YX_data( x_part, x_dim, random = False):
         train_set = RandomDataset(H_train, x_part, x_dim)
         val_set = RandomDataset(H_val, x_part, x_dim)
     else:
-        X = np.load('./dataset/X_bin.npy')
+        X = np.load(os.path.join(dataset_prefix, 'dataset/X_bin.npy'))
         X_train = X[:split, :]
         X_val = X[split:, :]
         train_set = dataset(X_train, H_train, x_part, x_dim)
