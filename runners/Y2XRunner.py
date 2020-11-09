@@ -8,7 +8,7 @@ import logging
 import sys
 sys.path.append('..')
 from Estimators import Y2XEstimator
-from get_data import get_YX_data
+from data import get_YX_data
 
 class Y2XRunner():
     def __init__(self, config):

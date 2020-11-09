@@ -3,10 +3,11 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 import numpy as np 
 import logging
+import os
 import sys
 sys.path.append('..')
 from Estimators import RouteEstimator
-from get_data import get_YH_data
+from data import get_YH_data
 
 class Y2HRunner():
     def __init__(self, config):
@@ -57,8 +58,7 @@ class Y2HRunner():
         for epoch in range(self.config.train.n_epochs):
             it = 0
             model.train()
-            for Yp, H_label in train_loader: # H_label: bsx256
-                it += 1
+            for Yp, H_label in train_loader: # H_label: bsx256 Yp bsx1024
                 Yp = Yp.to(device)
                 H_label = H_label.to(device)
 
@@ -68,10 +68,11 @@ class Y2HRunner():
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
+                nmse = self.NMSE(H_pred, H_label).item()
         
                 if it % self.config.log.print_freq == 0:
-                    logging.info('Iter{}/Epoch{} || MSE Loss: {}'.format(it, \
-                        epoch, self.NMSE(H_pred, H_label).cpu().item()))
+                    logging.info(f'Epoch {epoch:>2d} || Iter {it:<4d} || MSE Loss: {nmse:.5f}')
+                it += 1
                         
             with torch.no_grad():
                 model.eval()
@@ -82,14 +83,14 @@ class Y2HRunner():
                     H_label = H_label.to(device)
                     H_pred = model(Yp)
                     H_preds.append(H_pred)
+                    H_labels.append(H_label)
                 H_labels = torch.cat(H_labels, 0)
                 H_preds = torch.cat(H_preds, 0)
                 nmse = self.NMSE(H_preds, H_labels).item()
-                torch.save(model.state_dict(), os.path.join(self.config.log.ckpt_dir, 'epoch{}.pth'.format(epoch)))
+                torch.save(model.state_dict(), os.path.join(self.config.log.ckpt_dir, f'epoch{epoch:2d}.pth'))
                 if nmse < best_nmse:
                     best_nmse = nmse
-                    torch.save(model.state_dict(), self.config.log.ckpt_dir, 'best.pth')
+                    torch.save(model.state_dict(), os.path.join(self.config.log.ckpt_dir, 'best.pth'))
                 
-                logging.info('Validation Epoch {} || nmse: {}, best nmse: {}'.format( \
-                    epoch, nmse.cpu().item(), best_nmse))
+                logging.info(f'Validation Epoch {epoch:>2d} || mode: {self.mode}, Pn: {self.Pn}  nmse: {nmse:.5f}, best nmse: {best_nmse:.5f}')
                     

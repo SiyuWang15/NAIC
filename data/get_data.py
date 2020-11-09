@@ -64,8 +64,8 @@ class YHDataset(Dataset):
         return len(self.Y)
     
     def __getitem__(self, index):
-        YY = self.Y[index]
-        HH = self.H[index]
+        YY = self.Y[index, :]
+        HH = self.H[index, :]
         return YY, HH
 
 def get_Yp_modes(Pn):
@@ -82,18 +82,18 @@ def get_YH_data(mode, Pilotnum, H_domain = 'time'):
     # H: 32w x 4 x 256  complex number
     Yp_path = os.path.join(dataset_prefix, 'dataset/YHdata2/mode_{}_P_{}.npy'.format(mode, Pilotnum))
     H_path = os.path.join(dataset_prefix, 'dataset/YHdata/H_data.npy')
-    Yp = np.load(Yp_path)
+    Yp = np.load(Yp_path).astype('float32')
     H = np.load(H_path) # Nsx4x32 complex 
     H_real = np.real(H)
     H_imag = np.imag(H)
     H = np.stack([H_imag, H_real], axis=1)
-    H = H.reshape(len(H), -1) # Ns * 256
+    H = H.reshape(len(H), -1).astype('float32') # Ns * 256
     assert len(Yp) == len(H)
     split = int(len(H) * 0.9)
     H_train = H[:split, :]
     H_val = H[split:, :]
-    Yp_train = H[:split, :]
-    Yp_val = H[split:, :]
+    Yp_train = Yp[:split, :]
+    Yp_val = Yp[split:, :]
     train_set = YHDataset(Yp_train, H_train)
     val_set = YHDataset(Yp_val, H_val)
     return train_set, val_set
@@ -101,8 +101,8 @@ def get_YH_data(mode, Pilotnum, H_domain = 'time'):
 def get_YX_data( x_part, x_dim, random = False):
     H = np.load(os.path.join(dataset_prefix, 'dataset/H_data.npy'))
     split = int(0.9*len(H))
-    H_train = H[:split, :, :]
-    H_val = H[split:, :, :]
+    H_train = H[:split, :, :].astype('float32')
+    H_val = H[split:, :, :].astype('float32')
 
     if random:
         train_set = RandomDataset(H_train, x_part, x_dim)
