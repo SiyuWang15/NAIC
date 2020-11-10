@@ -10,3 +10,5 @@ RE: # Route Estimator
 ckpt:
   redir: /data/siyu/NAIC/workspace/Y2HEstimator/TEST # path to checkpoint files of route estimator
   medir: /data/siyu/NAIC/workspace/ModeEstimator/TEST # path to checkpoint files of mode estimator
+log:
+  run_mode: test

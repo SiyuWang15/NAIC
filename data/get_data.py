@@ -125,7 +125,7 @@ def get_test_data(Pn):
     Y = np.reshape(Y, (-1, 2, 2, 2, 256), order = 'F')
     Yp = np.reshape(Y[:, :, 0, :, :], [len(Y), 1024], order = 'F')
     Yd = np.reshape(Y[:, :, 1, :, :], [len(Y), 1024], order = 'F')
-    return Yp, Yd
+    return Yp, Yd # Nsx1024
 
 def get_val_data(Pn): # generate validation dataset based on H_val.bin
     # return
@@ -136,13 +136,16 @@ def get_val_data(Pn): # generate validation dataset based on H_val.bin
     H_data = open(H_path, 'rb')
     H = struct.unpack('f'*2*2*2*32*2000, H_data.read(4*2*2*2*32*2000))
     H = np.reshape(H, [2000, 2, 4, 32]).astype('float32')
+    H_label = np.reshape(H, [len(H), -1])
     H = H[:, 1, :, :] + 1j*H[:, 0, :, :]
+    modes = []
     X = []
     Yp = []
     Yd = []
     for i in range(len(H)):
         SNRdb = random.randint(8, 12)
         mode = random.randint(0, 2)
+        modes.append(mode)
         bits0 = np.random.binomial(1, 0.5, size = (128*4, ))
         bits1 = np.random.binomial(1, 0.5, size = (128*4, ))
         HH = H[i, :, :]
@@ -157,4 +160,5 @@ def get_val_data(Pn): # generate validation dataset based on H_val.bin
     Yp = np.stack(Yp, axis=0).astype('float32')
     Yd = np.stack(Yd, axis=0).astype('float32')
     X = np.stack(X, axis=0).astype('float32')
-    return Yp, Yd,  X, H
+    modes = np.array(modes)
+    return Yp, Yd,  X, H_label

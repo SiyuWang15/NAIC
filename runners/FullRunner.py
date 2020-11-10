@@ -36,47 +36,70 @@ class FullRunner():
             route_estimators.append(model)
         return mode_estimator, route_estimators
 
-    def run(self):
+    def test(self):
         device = 'cuda'
         mode_estimator, route_estimators = self.get_model(device)
         Yp, Yd = get_test_data(self.Pn)
+        Yp = torch.Tensor(Yp).to(device)
+        predH = self.estimateH(Yp, mode_estimator, route_estimators)
+        predX = self.estimateX(Yd, predH)
+        predX = np.array(np.floor(predX+0.5), dtype = np.bool)
+        print(predX)
+        if self.Pn == 32:
+            predX.tofile(os.path.join(self.config.log.log_dir, 'X_pre_1.bin'))
+        elif self.Pn == 8:
+            predX.tofile(os.path.join(self.config.log.log_dir, 'X_pre_2.bin'))
+        else:
+            raise NotImplementedError
     
     def validation(self):
         device = 'cuda'
         mode_estimator, route_estimators = self.get_model(device)
-        Yp, Yd, X_label, H_label = get_val_data(self.Pn)
+        Yp, Yd, X_label, H_label = get_val_data(self.Pn) # H_label: Nsx256
         Yp = torch.Tensor(Yp).to(device)
-        predX = self.estimateX(Yp, Yd, mode_estimator, route_estimators)
-        print(predX.shape)
+        predH = self.estimateH(Yp, mode_estimator, route_estimators) # Nsx256
+        logging.info(f'nmse of predicted H: {self.NMSE(predH, H_label)}')
+        _, predX = self.estimateX(Yd, predH)
         acc = (predX == X_label).astype('float32').mean()
         logging.info(acc)
 
-    def estimateX(self, Yp, Yd, mode_estimator, route_estimators): # for a single data item
+    def NMSE(self, H_pred, H_label):
+        mse = np.power(H_pred-H_label, 2).sum()
+        norm = np.power(H_label, 2).sum()
+        return mse / norm
+    
+    def estimateH(self, Yp, mode_estimator, route_estimators):
         Yp_modes = [[],[],[]]
-        Yd_modes = [[],[],[]]
-        X_modes = dict()
-        predX = []
-        cnt = [0, 0, 0]
+        H_modes = [[],[],[]]
+        predH = []
+        cnt = [0,0,0]
         with torch.no_grad():
-            mode = mode_estimator(Yp)
-            mode = torch.argmax(mode, dim = -1)
-            for i, m in enumerate(mode):
-                Yd_modes[m].append(Yd[i])
-                Yp_modes[m].append(Yp[i])
-            for mode in range(3):
-                tmp_Yd = np.stack(Yd_modes[mode], axis=0)
+            modes = mode_estimator(Yp)
+            modes = torch.argmax(modes, dim = -1)
+            modes = np.asarray(modes.cpu())
+            for i, mode in enumerate(modes):
+                Yp_modes[mode].append(Yp[i])
+            for mode in [0, 1, 2]:
                 tmp_Yp = torch.stack(Yp_modes[mode]).to(Yp.device)
                 H_est = route_estimators[mode](tmp_Yp)
                 H_est = np.asarray(H_est.cpu()) # Nsx256
-                Hf_est = transfer_H(H_est)
-                tmp_Yd = transfer_Y(tmp_Yd)
-                X_ML, X_bits = self.MLReceiver(tmp_Yd, Hf_est)
-                X_modes[mode] = X_bits
-            for i in range(len(Pd)):
-                thismode = mode[i]
-                predX.append(X_modes[thismode][cnt[thismode]])
-            predX = np.asarray(predX)
+                H_modes[mode] = H_est
+            for i in range(len(Yp)):
+                mode = modes[i]
+                predH.append(H_modes[mode][cnt[mode]])
+                cnt[mode] += 1
+            predH = np.asarray(predH)
+        return predH
+
+    def estimateX(self, Yd, H_est):
+        # Yd: Nsx1024
+        # H_est: Nsx256
+        Yd = transfer_Y(Yd)
+        Hf_est = transfer_H(H_est)
+        predX = self.MLReceiver(Yd, Hf_est)
         return predX
+
+
 
     def MLReceiver(self, Y, H):
         Codebook = self.MakeCodebook(4)
