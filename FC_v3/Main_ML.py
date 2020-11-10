@@ -37,7 +37,7 @@ N_train_groups = len(group_index)
 mode = -1
 
 # 生成测试数据 Y：-1*2048； X：-1*1024； H：-1*4*32 时域信道
-Y, X, H = generatorXY(batch_num,H_val,Pilotnum,0)
+Y, X, H = generatorXY(batch_num,H_val,Pilotnum)
 
 
 
@@ -48,9 +48,9 @@ Y, X, H = generatorXY(batch_num,H_val,Pilotnum,0)
 #### The first method
 # Model Construction
 in_dim = 1024
-h_dim = 4096
+h_dim = 2048
 out_dim = 256
-n_blocks =  2
+n_blocks =  4
 model = FC_Estimation(in_dim, h_dim, out_dim, n_blocks)
 
 model = torch.nn.DataParallel(model).cuda()  # model.module

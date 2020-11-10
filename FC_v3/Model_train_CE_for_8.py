@@ -40,7 +40,7 @@ epochs = 200
 learning_rate = 1e-3  # bigger to train faster
 num_workers = 4
 print_freq = 20
-val_freq = 100
+val_freq = 400
 iterations = 10000
 Pilotnum = 8
 mode = args.mode # 0,1,2,-1
@@ -61,9 +61,9 @@ H_val = H2[:,1,:,:]+1j*H2[:,0,:,:]   # time-domain channel for training
 
 # Model Construction
 in_dim = 1024
-h_dim = 4096
+h_dim = 2048
 out_dim = 256
-n_blocks =  2
+n_blocks =  6
 model = FC_Estimation(in_dim, h_dim, out_dim, n_blocks)
 # model = DnCNN()
 criterion = NMSELoss()
@@ -81,19 +81,23 @@ if load_flag:
     print("Weight Loaded!")
 
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-scheduler = lr_scheduler.StepLR(optimizer, step_size = 400, gamma=0.5) 
+scheduler = lr_scheduler.StepLR(optimizer, step_size = 500, gamma=0.5) 
 
 # generate data fro training
-train_data = generator(batch_size,H_tra,Pilotnum,mode)
-test_data = generatorXY(2000,H_val,Pilotnum,mode)
+train_data = generator(batch_size,H_tra,Pilotnum)
+# test_data = generatorXY(2000,H_val,Pilotnum,mode)
 
 print('==========Begin Training=========')
 iter = 0
 for Y,X,H in train_data:
     iter = iter+1
     # Obtain input data based on the LS channel estimation
+    optimizer.zero_grad()
+
     Y_reshape = np.reshape(Y, [batch_size, 2, 2, 2, 256], order='F')
     Yp = Y_reshape[:,:,0,:,:]
+
+    
     Yp = np.reshape(Yp, [batch_size, 2*2*256])
     Yp = torch.Tensor(Yp).to('cuda')
     # print(Yp.shape)
@@ -110,7 +114,7 @@ for Y,X,H in train_data:
     loss = criterion(H_hat_train, H_label_train)
     loss.backward()
     optimizer.step()
-    optimizer.zero_grad()
+
 
     scheduler.step()
     if iter % print_freq == 0:
@@ -121,11 +125,12 @@ for Y,X,H in train_data:
     if iter % val_freq == 0:
         model.eval()
         print('lr:%.4e'%optimizer.param_groups[0]['lr']) 
-        Y,X,H = test_data
-        Ns = Y.shape[0]
+        test_data = generatorXY(2000,H_val,Pilotnum,mode)
+        Y_test, X_test, H_test = test_data
+        Ns = Y_test.shape[0]
         # Obtain input data based on the LS channel estimation
 
-        Y_reshape = np.reshape(Y, [-1, 2, 2, 2, 256], order='F')
+        Y_reshape = np.reshape(Y_test, [-1, 2, 2, 2, 256], order='F')
         Yp = Y_reshape[:,:,0,:,:]
         Yp = np.reshape(Yp, [-1, 2*2*256])
         Yp = torch.Tensor(Yp).to('cuda')
@@ -134,8 +139,8 @@ for Y,X,H in train_data:
 
 
         H_label_test =  np.zeros(shape=[Ns,2,4,32],dtype=np.float32)
-        H_label_test[:,0,:,:] = H.real
-        H_label_test[:,1,:,:] = H.imag
+        H_label_test[:,0,:,:] = H_test.real
+        H_label_test[:,1,:,:] = H_test.imag
         H_label_test = np.reshape(H_label_test , [-1, 2*4*32])
         H_label_test = torch.Tensor(H_label_test).to('cuda')
 

@@ -69,14 +69,14 @@ class FC_Estimation(nn.Module):
             # nn.ReLU(inplace=True),
             nn.ELU(inplace=True),
             # nn.Sigmoid(),
-            # nn.BatchNorm1d(h_dim)
-            nn.Dropout(p=0.5)
+            nn.BatchNorm1d(h_dim)
+            # nn.Dropout(p=0.5)
         )
         hidden_layers = []
         for i in range(n_blocks):
             # hidden_layers.extend([nn.Linear(h_dim, h_dim), nn.ReLU(inplace=True),  nn.Dropout(p=0.5)]) 
             # # nn.BatchNorm1d(h_dim), nn.Dropout(p=0.5)
-            hidden_layers.extend([nn.Linear(h_dim, h_dim), nn.ELU(inplace=True),  nn.Dropout(p=0.5)]) 
+            hidden_layers.extend([nn.Linear(h_dim, h_dim), nn.ELU(inplace=True),  nn.BatchNorm1d(h_dim)]) 
             # hidden_layers.extend([nn.Linear(h_dim, h_dim), nn.Sigmoid(),  nn.Dropout(p=0.5)]) 
         self.hidden_layers = nn.ModuleList(hidden_layers)
         self.output_layer = nn.Linear(h_dim, out_dim)
