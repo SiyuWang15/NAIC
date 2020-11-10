@@ -5,7 +5,7 @@ from datetime import datetime
 from argparse import Namespace
 from utils import set_logger, seed_everything, get_config
 
-from runners import Y2HRunner, Y2XRunner, Y2ModeRunner
+from runners import Y2HRunner, Y2XRunner, Y2ModeRunner, FullRunner
 
 def run_y2h():
     config = get_config('./configs/y2h_config.yml')
@@ -31,5 +31,14 @@ def run_y2mode():
     runner = Y2ModeRunner(config)
     runner.run()
 
+def run_full():
+    config = get_config('./configs/full_config.yml')
+    now = datetime.now()
+    config.log_prefix = 'Full_runner'
+    config.log_dir = os.path.join('workspace', config.log_prefix, now.strftime('%H-%M-%S'))
+    os.makedirs(config.log_dir)
+    runner = FullRunner(config)
+    runner.validation()
+
 if __name__ == "__main__":
-    run_y2h()
+    run_full()

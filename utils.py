@@ -44,7 +44,7 @@ def arg_parser():
     return parser
 
 def get_config(fp):
-    config = yaml.load(open(fp))
+    config = yaml.safe_load(open(fp))
     for k, v in config.items():
         config[k] = argparse.Namespace(**v)
     config = argparse.Namespace(**config)
@@ -53,6 +53,8 @@ def get_config(fp):
 def to_numpy(x):
     if not (type(x) is np.ndarray):
         return np.array(x)
+    else:
+        return x
 
 def flattern_Y(Y): # Nsx2x2x2x256 or Nsx2x2x256
     # for 2x2x2x256, imag or real, Yp and Yd, 2, 256
@@ -62,35 +64,43 @@ def flattern_Y(Y): # Nsx2x2x2x256 or Nsx2x2x256
     assert YY.shape[-1] == 2048 or YY.shape[-1] == 1024
     return YY
 
-def fuck_Y(Y): # Nsx2048 or Nsx1024
+def transfer_Y(Y): # Nsx2048 or Nsx1024  
+    # return YY: Nsx2x256 complex number can be fed into MLReceiver
+    # return YY: Nsx2x2x256 complex number should extract data first and then feed into Receiver
     YY = to_numpy(Y)
     assert YY.shape[-1] == 2048 or YY.shape[-1] == 1024
     if YY.shape[-1] == 2048:
         YY = np.reshape(YY, [-1, 2, 2, 2, 256], order = 'F') 
-        print('Yp and Yd are all here.')
-        return YY
+        # print('Yp and Yd are all here.')
+        return real2complex(YY, 'Y')
     if YY.shape[-1] == 1024:
         YY = np.reshape(YY, [-1, 2, 2, 256], order = 'F')
-        print('only Yp or Yd')
-        return YY
+        # print('only Yp or Yd')
+        return real2complex(YY, 'Yd')
 
-def flatter_H(H):  # only for time domain
+def flattern_H(H):  # only for time domain
     # H: Nsx2x4x32 imag or real, 4 routes, 32 dimension in time domain
+    # This is only for siyu's Hdata since siyu didn't reshape H via order 'F'
     HH = to_numpy(H)
     return np.reshape(HH, [len(HH), -1])
 
 
-def fuck_H(H): # only for time domain
-    # H: Nsx256
+def transfer_H(H):
+    # H: Nsx256 complex number 
+    # For siyu's Hdata
+    # transfer time domain H which can be fed into MIMO  TOOOOO frequency domain H which can be fed into MLReceiver. 
     HH = to_numpy(H)
-    return np.reshape(HH, [len(HH), 2, 4, 32])
+    HH = np.reshape(HH, [len(HH), 2, 4, 32])
+    HH = HH[:, 1, :, :] + 1j * HH[:, 0, :, :]
+    Hf = np.fft.fft(HH, 256) / 20.
+    Hf = np.reshape(Hf, (len(HH), 2, 2, 256), order = 'F')
+    return Hf
 
-def FFT_H(H_time):
-    H_freq = np.reshape(H_time, [len(H_time), 2, 2, 2, 32]) # imag or real, sender, receiver, 32 dimension in time domain
-    H_freq = H_freq[:, 1, :, :, :] + H_freq[:, 0, :, :, :] * 1j
-    H_freq = np.fft.fft(H_freq, 256) / 20
-    
-    pass
-
-def IFFT_H(H_freq):
-    pass
+def real2complex(D, tag):
+    # D: Yp&Yd: Nsx2x2x256 or Y: Nsx2x2x2x256 or H: Nsx2x4x32
+    if tag == 'H':
+        return D[:, 1, :, :] + 1j * D[:, 0, :, :]
+    if tag == 'Yp' or tag == 'Yd':
+        return D[:, 0, :, :] + 1j * D[:, 1, :, :]
+    if tag == 'Y':
+        return D[:, 0, :, :, :] + 1j * D[:, 1, :, :, :]

@@ -123,15 +123,19 @@ def get_test_data(Pn):
     Y = np.loadtxt(dp, dtype = np.str, delimiter=',')
     Y = Y.astype(np.float32)
     Y = np.reshape(Y, (-1, 2, 2, 2, 256), order = 'F')
-    Yp = Y[:, :, 0, :, :].reshape([:, 1024], order = 'F')
-    Yd = Y[:, :, 1, :, :].reshape([:, 1024], order = 'F')
+    Yp = np.reshape(Y[:, :, 0, :, :], [len(Y), 1024], order = 'F')
+    Yd = np.reshape(Y[:, :, 1, :, :], [len(Y), 1024], order = 'F')
     return Yp, Yd
 
 def get_val_data(Pn): # generate validation dataset based on H_val.bin
-    H_path = os.path.join(data_prefix, 'dataset/H_val.bin')
+    # return
+    #   Yp and Yd: Nsx1024 order F
+    #   X: Nsx1024
+    #   H: Nsx4x32 complex number can be directly fed into MIMO
+    H_path = os.path.join(dataset_prefix, 'dataset/H_val.bin')
     H_data = open(H_path, 'rb')
-    H = struct.unpack('f'*2*2*2*32*320000, H_data.read(4*2*2*2*32*320000))
-    H = H.reshape([320000, 2, 4, 32]).astype('float32')
+    H = struct.unpack('f'*2*2*2*32*2000, H_data.read(4*2*2*2*32*2000))
+    H = np.reshape(H, [2000, 2, 4, 32]).astype('float32')
     H = H[:, 1, :, :] + 1j*H[:, 0, :, :]
     X = []
     Yp = []

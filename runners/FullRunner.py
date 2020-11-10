@@ -2,7 +2,9 @@ import torch
 import torch.nn as nn
 import numpy as np 
 import os 
+import logging
 import sys
+import time
 sys.path.append('..')
 from utils import *
 
@@ -21,12 +23,17 @@ class FullRunner():
         mode_estimator = ModeEstimator()
         load_path = os.path.join(self.config.ckpt.medir, f'best_ckpt_P{self.Pn}.pth')
         mode_estimator.load_state_dict(torch.load(load_path))
+        mode_estimator.to(device)
+        mode_estimator.eval()
         route_estimators = []
         for mode in [0, 1, 2]:
             model = RouteEstimator(self.config.RE.in_dim, self.config.RE.out_dim, \
                     self.config.RE.h_dims, self.config.RE.act)
             load_path = os.path.join(self.config.ckpt.redir, f'best_mode_{mode}_Pn_{self.Pn}.pth')
             model.load_state_dict(torch.load(load_path))
+            model.to(device)
+            model.eval()
+            route_estimators.append(model)
         return mode_estimator, route_estimators
 
     def run(self):
@@ -38,33 +45,40 @@ class FullRunner():
         device = 'cuda'
         mode_estimator, route_estimators = self.get_model(device)
         Yp, Yd, X_label, H_label = get_val_data(self.Pn)
-        Yp = torch.Tensor(Yp, device = device)
-        Yd = Yd.reshape(Yd, [len(Yd), 2, 2, 256], order = 'F')
+        Yp = torch.Tensor(Yp).to(device)
+        predX = self.estimateX(Yp, Yd, mode_estimator, route_estimators)
+        print(predX.shape)
+        acc = (predX == X_label).astype('float32').mean()
+        logging.info(acc)
 
-    
     def estimateX(self, Yp, Yd, mode_estimator, route_estimators): # for a single data item
         Yp_modes = [[],[],[]]
         Yd_modes = [[],[],[]]
-        pred_X = []
+        X_modes = dict()
+        predX = []
+        cnt = [0, 0, 0]
         with torch.no_grad():
             mode = mode_estimator(Yp)
             mode = torch.argmax(mode, dim = -1)
             for i, m in enumerate(mode):
                 Yd_modes[m].append(Yd[i])
                 Yp_modes[m].append(Yp[i])
-            for i in range(3):
-                tmp_Yd = np.stack(Yd_modes[i], axis=0)
-                tmp_Yp = torch.stack(Yp_modes[i]).to(device)
-                H_est = route_estimators[i](tmp_Yp)
+            for mode in range(3):
+                tmp_Yd = np.stack(Yd_modes[mode], axis=0)
+                tmp_Yp = torch.stack(Yp_modes[mode]).to(Yp.device)
+                H_est = route_estimators[mode](tmp_Yp)
                 H_est = np.asarray(H_est.cpu()) # Nsx256
-                tmp_Yd = np.reshape(tmp_Yd, (len(tmp_Yd), 2, 2, 256), order = 'F')
-                tmp_Yd = tmp_Yd[:, 0, :, :] + tmp_Yd[:, 1, :, :]
-                H_est = np.reshape(H_est, (len(H_est), 2, 2, 2, 32))
-                H_est = H[:, 1, :, :, :] + 1j * H[:, 0, :, :, :]
+                Hf_est = transfer_H(H_est)
+                tmp_Yd = transfer_Y(tmp_Yd)
+                X_ML, X_bits = self.MLReceiver(tmp_Yd, Hf_est)
+                X_modes[mode] = X_bits
+            for i in range(len(Pd)):
+                thismode = mode[i]
+                predX.append(X_modes[thismode][cnt[thismode]])
+            predX = np.asarray(predX)
+        return predX
 
-                
-
-    def MLReceivers(self, Y, H):
+    def MLReceiver(self, Y, H):
         Codebook = self.MakeCodebook(4)
         G, P = Codebook.shape
         assert P == 2**G
