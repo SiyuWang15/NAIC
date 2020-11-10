@@ -8,7 +8,7 @@ from scipy.io import loadmat
 from scipy.io import savemat
 
 from Model_define_pytorch import FC_Estimation, NMSELoss, NMSELoss2, DatasetFolder
-from LS_CE import LS_Estimation,MMSE_Estimation, Interpolation_f
+# from LS_CE import LS_Estimation,MMSE_Estimation, Interpolation_f
 
 from MLreceiver import MLReceiver, MakeCodebook
 from SoftMLreceiver import SoftMLReceiver
@@ -34,10 +34,10 @@ group_index = list(range(32))
 group_num = 32
 G = 256 // group_num
 N_train_groups = len(group_index)
-mode = -1
+mode = 0
 
 # 生成测试数据 Y：-1*2048； X：-1*1024； H：-1*4*32 时域信道
-Y, X, H = generatorXY(batch_num,H_val,Pilotnum)
+Y, X, H = generatorXY(batch_num,H_val,Pilotnum,SNRdb=-1,mode=mode)
 
 
 
@@ -48,9 +48,9 @@ Y, X, H = generatorXY(batch_num,H_val,Pilotnum)
 #### The first method
 # Model Construction
 in_dim = 1024
-h_dim = 2048
+h_dim = 4096
 out_dim = 256
-n_blocks =  4
+n_blocks =  2
 model = FC_Estimation(in_dim, h_dim, out_dim, n_blocks)
 
 model = torch.nn.DataParallel(model).cuda()  # model.module

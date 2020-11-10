@@ -9,14 +9,15 @@ from scipy.io import loadmat
 from scipy.io import savemat
 import time
 from Model_define_pytorch import FC_Estimation, NMSELoss, DatasetFolder, DnCNN
-from generate_data import generator,generatorXY
+from generate_data import *
 import argparse
 from torch.optim import lr_scheduler
+from torch.utils.data import Dataset, DataLoader
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--load_flag', type = bool, default = False)
 parser.add_argument('--gpu_list',  type = str,  default='4,5,6,7', help='input gpu list')
-parser.add_argument('--mode',  type = int,  default= -1, help='input mode')
+parser.add_argument('--mode',  type = int,  default= 0, help='input mode')
 args = parser.parse_args()
 
 
@@ -36,14 +37,18 @@ SEED = 42
 seed_everything(SEED)
 
 batch_size = 256
-epochs = 200
-learning_rate = 1e-3  # bigger to train faster
-num_workers = 4
-print_freq = 20
-val_freq = 400
+epochs = 500
+learning_rate = 2e-3  # bigger to train faster
+lr_threshold = 1e-5
+lr_freq = 10
+
+num_workers = 16
+print_freq = 100
+val_freq = 100
 iterations = 10000
 Pilotnum = 8
 mode = args.mode # 0,1,2,-1
+SNRdB = -1
 load_flag = args.load_flag
 best_loss = 100
 
@@ -61,9 +66,9 @@ H_val = H2[:,1,:,:]+1j*H2[:,0,:,:]   # time-domain channel for training
 
 # Model Construction
 in_dim = 1024
-h_dim = 2048
+h_dim = 4096
 out_dim = 256
-n_blocks =  6
+n_blocks =  2
 model = FC_Estimation(in_dim, h_dim, out_dim, n_blocks)
 # model = DnCNN()
 criterion = NMSELoss()
@@ -81,83 +86,117 @@ if load_flag:
     print("Weight Loaded!")
 
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-scheduler = lr_scheduler.StepLR(optimizer, step_size = 500, gamma=0.5) 
-
+'''
 # generate data fro training
-train_data = generator(batch_size,H_tra,Pilotnum)
-# test_data = generatorXY(2000,H_val,Pilotnum,mode)
+data_load_address = '/data/CuiMingyao/AI_competition/OFDMReceiver/'
+Y_train = np.load(data_load_address+'training_Y_P='+str(Pilotnum)+'_mode='+str(mode)+'.npy')
+
+# Y_train = Y_train[:300000,:]
+N_train = Y_train.shape[0]
+Y_train = Y_train.astype(np.float32)
+
+# Obtain input data
+Y_train = np.reshape(Y_train, [-1, 2, 2, 2, 256], order='F')
+Y_input_train = Y_train[:,:,0,:,:]   # 取出接收导频信号，实部虚部*两根接收天线*256子载波
+Y_input_train = np.reshape(Y_input_train, [N_train, 2*2*256])
+
+# Obtain label data for training
+Ht = np.reshape(H_tra,[-1,2,2,32], order='F') # time-domain channel
+Ht_label_train = np.zeros(shape=[N_train, 2, 2, 2, 32], dtype=np.float32)
+Ht_label_train[:, 0, :, :, :] = Ht.real
+Ht_label_train[:, 1, :, :, :] = Ht.imag
+Ht_label_train = np.reshape(Ht_label_train , [-1, 2*4*32])
+
+# dataLoader for training
+train_dataset = DatasetFolder(Y_input_train, Ht_label_train)
+train_loader = torch.utils.data.DataLoader(
+    train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True, drop_last=True)
+'''
+# test_data = generator(2000,H_tra,Pilotnum)
+train_dataset  = RandomDataset(H_tra,Pilot_num=Pilotnum,SNRdb=SNRdB,mode=mode)
+train_dataloader = DataLoader(dataset = train_dataset, batch_size = batch_size, shuffle = False, num_workers = num_workers, drop_last = True, pin_memory = True)
+
+test_dataset  = RandomDataset(H_val,Pilot_num=Pilotnum,SNRdb=SNRdB,mode=mode)
+test_dataloader = DataLoader(dataset = test_dataset, batch_size = 2000, shuffle = False, num_workers = num_workers, drop_last = True, pin_memory = True)
 
 print('==========Begin Training=========')
 iter = 0
-for Y,X,H in train_data:
-    iter = iter+1
-    # Obtain input data based on the LS channel estimation
-    optimizer.zero_grad()
-
-    Y_reshape = np.reshape(Y, [batch_size, 2, 2, 2, 256], order='F')
-    Yp = Y_reshape[:,:,0,:,:]
-
-    
-    Yp = np.reshape(Yp, [batch_size, 2*2*256])
-    Yp = torch.Tensor(Yp).to('cuda')
-    # print(Yp.shape)
-
-    H_hat_train = model(Yp)
+for epoch in range(epochs):
+    print('=================================')
+    print('lr:%.4e'%optimizer.param_groups[0]['lr'])
+    # model training
+    model.train()
 
 
-    H_label_train =  np.zeros(shape=[batch_size,2,4,32],dtype=np.float32)
-    H_label_train[:,0,:,:] = H.real
-    H_label_train[:,1,:,:] = H.imag
-    H_label_train = np.reshape(H_label_train , [-1, 2*4*32])
-    H_label_train = torch.Tensor(H_label_train).to('cuda')
+    for it, (Y_train, H_train, X_train) in enumerate(train_dataloader):
 
-    loss = criterion(H_hat_train, H_label_train)
-    loss.backward()
-    optimizer.step()
+        Y_train = np.reshape(Y_train, [batch_size, 2, 2, 2, 256], order='F').float()
+        Y_input_train = Y_train[:,:,0,:,:]   # 取出接收导频信号，实部虚部*两根接收天线*256子载波
+        Y_input_train = np.reshape(Y_input_train, [batch_size, 2*2*256])
+
+        Ht_train = np.reshape(H_train,[batch_size,2,2,32], order='F') # time-domain channel
+        Ht_label_train = np.zeros(shape=[batch_size, 2, 2, 2, 32], dtype=np.float32)
+        Ht_label_train[:, 0, :, :, :] = Ht_train.real
+        Ht_label_train[:, 1, :, :, :] = Ht_train.imag
+        Ht_label_train = np.reshape(Ht_label_train , [batch_size, 2*4*32])
+
+        Y_input_train = torch.Tensor(Y_input_train).cuda()
+        Ht_label_train = torch.Tensor(Ht_label_train).cuda()
+
+        optimizer.zero_grad()
+        Ht_hat_train = model(Y_input_train)
 
 
-    scheduler.step()
-    if iter % print_freq == 0:
-        # print('lr:%.4e' % optimizer.param_groups[0]['lr'])
-        # print('Iter: {}\t' 'Loss {loss:.4f}\t'.format(iter, loss=loss.item()))
-        print('Completed iterations [%d]\t' % iter, 'Loss {loss:.4f}\t'.format(loss=loss.item()),time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
+        loss = criterion(Ht_hat_train, Ht_label_train)
 
-    if iter % val_freq == 0:
-        model.eval()
-        print('lr:%.4e'%optimizer.param_groups[0]['lr']) 
-        test_data = generatorXY(2000,H_val,Pilotnum,mode)
-        Y_test, X_test, H_test = test_data
-        Ns = Y_test.shape[0]
+        loss.backward()
+        optimizer.step()
+
+        if it % print_freq == 0:
+            print('Mode:{0}'.format(mode), 'Epoch: [{0}][{1}/{2}]\t'
+                  'Loss {loss:.4f}\t'.format(
+                epoch, it, len(train_dataloader), loss=loss.item()),time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
+
+    if epoch >0:
+        if epoch % lr_freq ==0:
+            optimizer.param_groups[0]['lr'] =  optimizer.param_groups[0]['lr'] * 0.2
+        if optimizer.param_groups[0]['lr'] < lr_threshold:
+            optimizer.param_groups[0]['lr'] = lr_threshold
+
+
+    # 验证集
+    model.eval()
+    total_loss = 0
+    for  Y_test, H_test, X_test  in test_dataloader:
+        N_test = Y_test.shape[0]
         # Obtain input data based on the LS channel estimation
 
-        Y_reshape = np.reshape(Y_test, [-1, 2, 2, 2, 256], order='F')
-        Yp = Y_reshape[:,:,0,:,:]
-        Yp = np.reshape(Yp, [-1, 2*2*256])
-        Yp = torch.Tensor(Yp).to('cuda')
+        Y_reshape_test = np.reshape(Y_test, [-1, 2, 2, 2, 256], order='F').float()
+        Yp_test = Y_reshape_test[:,:,0,:,:]
+        Yp_test = np.reshape(Yp_test, [-1, 2*2*256])
+        Yp_test = torch.Tensor(Yp_test).to('cuda')
 
-        H_hat_test = model(Yp)
+        H_hat_test = model(Yp_test)
+
+        Ht_test = np.reshape(H_test,[N_test,2,2,32], order='F') # time-domain channel
+        Ht_label_test = np.zeros(shape=[N_test, 2, 2, 2, 32], dtype=np.float32)
+        Ht_label_test[:, 0, :, :, :] = Ht_test.real
+        Ht_label_test[:, 1, :, :, :] = Ht_test.imag
+        Ht_label_test = np.reshape(Ht_label_test , [N_test, 2*4*32])
+        Ht_label_test = torch.Tensor(Ht_label_test).cuda()    
 
 
-        H_label_test =  np.zeros(shape=[Ns,2,4,32],dtype=np.float32)
-        H_label_test[:,0,:,:] = H_test.real
-        H_label_test[:,1,:,:] = H_test.imag
-        H_label_test = np.reshape(H_label_test , [-1, 2*4*32])
-        H_label_test = torch.Tensor(H_label_test).to('cuda')
-
-
-        average_loss = criterion(H_hat_test, H_label_test).item()
+        average_loss = criterion(H_hat_test, Ht_label_test).item()
         print('NMSE %.4f' % average_loss)
         if average_loss < best_loss:
             # model save
             modelSave =  '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/FC_Estimation_Pilot'+str(Pilotnum)+'_mode'+str(mode)+'.pth.tar'
-            # try:
-            torch.save({'state_dict': model.state_dict(), }, modelSave, _use_new_zipfile_serialization=False)
-            # except:
-            #     torch.save({'state_dict': model.module.state_dict(), }, modelSave,_use_new_zipfile_serialization=False)
+            try:
+                torch.save({'state_dict': model.state_dict(), }, modelSave, _use_new_zipfile_serialization=False)
+            except:
+                torch.save({'state_dict': model.module.state_dict(), }, modelSave,_use_new_zipfile_serialization=False)
             print('Model saved!')
             best_loss = average_loss
-        
-        model.train()
+    
+    model.train()
 
-    if iter>iterations:
-        break

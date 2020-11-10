@@ -92,112 +92,6 @@ class FC_Estimation(nn.Module):
         return x
 
 
-'''
-class FC_Estimation(nn.Module):
-    def __init__(self, in_dim, n_hidden_1, nhidden_2, out_dim):
-        super(FC_Estimation, self).__init__()
-        self.bn0 = nn.BatchNorm1d(in_dim)
-        self.fc1 = nn.Linear(in_dim, n_hidden_1)
-        self.bn1 = nn.BatchNorm1d(n_hidden_1)
-        self.Re1 = nn.ReLU(inplace=True)
-        self.fc2 = nn.Linear(n_hidden_1, nhidden_2)
-        self.bn2 = nn.BatchNorm1d(nhidden_2)
-        self.Re2 = nn.ReLU(inplace=True)
-        self.fc3 = nn.Linear(nhidden_2, out_dim)
-        
-        
-
-    def forward(self, x):
-        x = x.view(-1, 2048)
-        x = self.bn0(x)
-        x = self.fc1(x)
-        x = self.bn1(x)
-        x = self.Re1(x)
-        x = self.fc2(x)
-        x = self.bn2(x)
-        x = self.Re2(x)
-        x = self.fc3(x)
-        x = x.view(-1,2,2,2,256)
-        return x
-
-'''
-
-
-class FC_Estimation32to32(nn.Module):
-    def __init__(self, in_dim, n_hidden_1, nhidden_2, nhidden_3, nhidden_4, out_dim):
-        super(FC_Estimation32to32, self).__init__()
-        self.bn0 = nn.BatchNorm1d(in_dim)
-        self.fc1 = nn.Linear(in_dim, n_hidden_1)
-        self.bn1 = nn.BatchNorm1d(n_hidden_1)
-        self.Re1 = nn.ReLU(inplace=True)
-        self.fc2 = nn.Linear(n_hidden_1, nhidden_2)
-        self.bn2 = nn.BatchNorm1d(nhidden_2)
-        self.Re2 = nn.ReLU(inplace=True)
-        self.fc3 = nn.Linear(nhidden_2, nhidden_3)
-        self.bn3 = nn.BatchNorm1d(nhidden_3)
-        self.Re3 = nn.ReLU(inplace=True)
-        self.fc4 = nn.Linear(nhidden_3, nhidden_4)
-        self.bn4 = nn.BatchNorm1d(nhidden_4)
-        self.Re4 = nn.ReLU(inplace=True)
-        self.fc5 = nn.Linear(nhidden_4, out_dim)
-        
-
-    def forward(self, x):
-        x = x.view(-1, 256)
-        x = self.bn0(x)
-        x = self.fc1(x)
-        x = self.Re1(x)
-        x = self.bn1(x)
-        x = self.fc2(x)
-        x = self.Re2(x)
-        x = self.bn2(x)
-        x = self.fc3(x)
-        x = self.Re3(x)
-        x = self.bn3(x)
-        x = self.fc4(x)
-        x = self.Re4(x)
-        x = self.bn4(x)
-        x = self.fc5(x)
-        x = x.view(-1,2,2,2,32)
-        return x
-
-
-class FC_Estimation8to32(nn.Module):
-    def __init__(self, in_dim, n_hidden_1, nhidden_2, nhidden_3, nhidden_4, out_dim):
-        super(FC_Estimation8to32, self).__init__()
-        self.bn0 = nn.BatchNorm1d(in_dim)
-        self.fc1 = nn.Linear(in_dim, n_hidden_1)
-        self.bn1 = nn.BatchNorm1d(n_hidden_1)
-        self.Re1 = nn.ReLU(inplace=True)
-        self.fc2 = nn.Linear(n_hidden_1, nhidden_2)
-        self.bn2 = nn.BatchNorm1d(nhidden_2)
-        self.Re2 = nn.ReLU(inplace=True)
-        self.fc3 = nn.Linear(nhidden_2, nhidden_3)
-        self.bn3 = nn.BatchNorm1d(nhidden_3)
-        self.Re3 = nn.ReLU(inplace=True)
-        self.fc4 = nn.Linear(nhidden_3, nhidden_4)
-        self.bn4 = nn.BatchNorm1d(nhidden_4)
-        self.Re4 = nn.ReLU(inplace=True)
-        self.fc5 = nn.Linear(nhidden_4, out_dim)
-
-    def forward(self, x):
-        x = x.view(-1, 64)
-        x = self.bn0(x)
-        x = self.fc1(x)
-        x = self.Re1(x)
-        x = self.bn1(x)
-        x = self.fc2(x)
-        x = self.Re2(x)
-        x = self.bn2(x)
-        x = self.fc3(x)
-        x = self.Re3(x)
-        x = self.bn3(x)
-        x = self.fc4(x)
-        x = self.Re4(x)
-        x = self.bn4(x)
-        x = self.fc5(x)
-        x = x.view(-1, 2, 2, 2, 32)
-        return x
 
 class DnCNN(nn.Module):
     def __init__(self, num_of_layers=17):
@@ -263,20 +157,7 @@ class NMSELoss2(nn.Module):
             nmse = torch.sum(nmse)
         return nmse
 
-# class NMSELoss(nn.Module):
-#     def __init__(self, reduction='sum'):
-#         super(NMSELoss, self).__init__()
-#         self.reduction = reduction
-#
-#     def forward(self, x_hat, x):
-#         x_hat = x_hat[:, 0, :, :, :] + 1j * x_hat[:, 1, :, :, :]
-#         x = x[:, 0, :, :, :] + 1j * x[:, 1, :, :, :]
-#         nmse = torch.sum(abs(x_hat - x) ** 2) / torch.sum(abs(x) ** 2)
-#         # if self.reduction == 'mean':
-#         #     nmse = torch.mean(nmse)
-#         # else:
-#         #     nmse = torch.sum(nmse)
-#         return nmse
+
 
 
 # dataLoader
@@ -291,6 +172,7 @@ class DatasetFolder(Dataset):
 
     def __getitem__(self, index):
         return self.matdata[index], self.matlable[index]  # , self.matdata[index]
+
 
 
 if __name__ == '__main__':
