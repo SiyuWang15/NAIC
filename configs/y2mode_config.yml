@@ -7,9 +7,9 @@ log:
   val_freq: 1
   save_freq: 1
 model:
-  h_dims: [512, 512, 256]
+  h_dims: [512, 256, 64]
   in_dim: 1024
-  out_dim: 256
+  out_dim: 2
   act: sigmoid
   Hdom: time
 train:

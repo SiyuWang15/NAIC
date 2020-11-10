@@ -22,7 +22,7 @@ class Y2ModeRunner():
             raise NotImplementedError('Optimizer {} not understood.'.format(self.config.train.optimizer))
     
     def run(self):
-        model = ModeEstimator()
+        model = ModeEstimator(self.config.model.in_dim, self.config.model.h_dims, self.config.model.out_dim) # out_dim 2 or 3 
         device = 'cuda'
         model.to(device)
         optimizer = self.get_optimizer(model.parameters())

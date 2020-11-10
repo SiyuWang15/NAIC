@@ -91,7 +91,7 @@ def transfer_H(H):
     # transfer time domain H which can be fed into MIMO  TOOOOO frequency domain H which can be fed into MLReceiver. 
     HH = to_numpy(H)
     HH = np.reshape(HH, [len(HH), 2, 4, 32])
-    HH = HH[:, 1, :, :] + 1j * HH[:, 0, :, :]
+    HH = real2complex(HH, 'H')
     Hf = np.fft.fft(HH, 256) / 20.
     Hf = np.reshape(Hf, (len(HH), 2, 2, 256), order = 'F')
     return Hf

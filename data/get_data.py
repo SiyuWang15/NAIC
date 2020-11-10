@@ -3,6 +3,7 @@ import random
 import torch
 from torch.utils.data import Dataset
 import os 
+import logging
 import struct
 
 from .Communication import *
@@ -70,6 +71,10 @@ class YHDataset(Dataset):
         HH = self.H[index, :]
         return YY, HH
 
+class RandomYHDataset(Dataset):
+    def __init__(self, H):
+        raise NotImplementedError
+
 def get_Yp_modes(Pn):
     data_path = os.path.join(dataset_prefix, 'dataset/random_mode/Yp2mode_Pilot{}.npy'.format(Pn))
     Yp = np.load(data_path, allow_pickle=True)
@@ -88,7 +93,7 @@ def get_YH_data(mode, Pilotnum, H_domain = 'time'):
     H = np.load(H_path) # Nsx4x32 complex 
     H_real = np.real(H)
     H_imag = np.imag(H)
-    H = np.stack([H_imag, H_real], axis=1)
+    H = np.stack([H_imag, H_real], axis=1) # Nsx2x4x32 
     H = H.reshape(len(H), -1).astype('float32') # Ns * 256
     assert len(Yp) == len(H)
     split = int(len(H) * 0.9)
@@ -120,8 +125,9 @@ def get_YX_data( x_part, x_dim, random = False):
 def get_test_data(Pn):
     tag = 1 if Pn == 32 else 2
     dp = os.path.join(dataset_prefix, f'dataset/Y_{tag}.csv')
+    logging.info(f'loading test data from {dp}')
     Y = np.loadtxt(dp, dtype = np.str, delimiter=',')
-    Y = Y.astype(np.float32)
+    Y = Y.astype(np.float32) # 10000x2048
     Y = np.reshape(Y, (-1, 2, 2, 2, 256), order = 'F')
     Yp = np.reshape(Y[:, :, 0, :, :], [len(Y), 1024], order = 'F')
     Yd = np.reshape(Y[:, :, 1, :, :], [len(Y), 1024], order = 'F')

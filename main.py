@@ -31,15 +31,6 @@ def run_y2mode():
     runner = Y2ModeRunner(config)
     runner.run()
 
-# def run_validation():
-#     config = get_config('./configs/full_config.yml')
-#     now = datetime.now()
-#     config.log.log_dir = os.path.join('workspace', config.log.log_prefix, now.strftime('%H-%M-%S'))
-#     os.makedirs(config.log.log_dir)
-#     set_logger(config)
-#     logging.info(config)
-#     runner = FullRunner(config)
-#     runner.validation()
 
 def run_full():
     config = get_config('./configs/full_config.yml')
@@ -48,20 +39,18 @@ def run_full():
     os.makedirs(config.log.log_dir)
     set_logger(config)
     logging.info(config)
-    runner = FullRunner(config)
     if config.log.run_mode == 'validation':
         config.RE.vaPilotnum=32
         logging.info('validating on Pn=32')
+        runner = FullRunner(config)
         runner.validation()
         config.RE.Pilotnum=8
         logging.info('validating on Pn=8')
+        runner = FullRunner(config)
         runner.validation()
     elif config.log.run_mode == 'test':
-        config.RE.Pilotnum = 32
-        logging.info('testing on Pn=32')
-        runner.test()
-        config.RE.Pilotnum=8
-        logging.info('testing on Pn=8')
+        logging.info(f'testing on Pn={config.RE.Pilotnum}')
+        runner = FullRunner(config)
         runner.test()
 
 

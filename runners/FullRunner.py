@@ -44,14 +44,14 @@ class FullRunner():
         predH = self.estimateH(Yp, mode_estimator, route_estimators)
         predX = self.estimateX(Yd, predH)
         predX = np.array(np.floor(predX+0.5), dtype = np.bool)
-        print(predX)
         if self.Pn == 32:
-            predX.tofile(os.path.join(self.config.log.log_dir, 'X_pre_1.bin'))
+            dp = os.path.join(self.config.log.log_dir, 'X_pre_1.bin')
         elif self.Pn == 8:
-            predX.tofile(os.path.join(self.config.log.log_dir, 'X_pre_2.bin'))
-        else:
-            raise NotImplementedError
-    
+            dp = os.path.join(self.config.log.log_dir, 'X_pre_2.bin')
+        predX.tofile(dp)
+        logging.info(f'results save in {dp}')
+
+
     def validation(self):
         device = 'cuda'
         mode_estimator, route_estimators = self.get_model(device)
@@ -59,7 +59,7 @@ class FullRunner():
         Yp = torch.Tensor(Yp).to(device)
         predH = self.estimateH(Yp, mode_estimator, route_estimators) # Nsx256
         logging.info(f'nmse of predicted H: {self.NMSE(predH, H_label)}')
-        _, predX = self.estimateX(Yd, predH)
+        predX = self.estimateX(Yd, predH)
         acc = (predX == X_label).astype('float32').mean()
         logging.info(acc)
 
@@ -80,10 +80,14 @@ class FullRunner():
             for i, mode in enumerate(modes):
                 Yp_modes[mode].append(Yp[i])
             for mode in [0, 1, 2]:
+                if len(Yp_modes[mode]) == 0:
+                    continue
                 tmp_Yp = torch.stack(Yp_modes[mode]).to(Yp.device)
                 H_est = route_estimators[mode](tmp_Yp)
                 H_est = np.asarray(H_est.cpu()) # Nsx256
                 H_modes[mode] = H_est
+            for mode in [0,1,2]:
+                logging.info(f'number of Y in mode {mode}: {len(H_modes[mode])}')
             for i in range(len(Yp)):
                 mode = modes[i]
                 predH.append(H_modes[mode][cnt[mode]])
@@ -96,10 +100,8 @@ class FullRunner():
         # H_est: Nsx256
         Yd = transfer_Y(Yd)
         Hf_est = transfer_H(H_est)
-        predX = self.MLReceiver(Yd, Hf_est)
+        _, predX = self.MLReceiver(Yd, Hf_est)
         return predX
-
-
 
     def MLReceiver(self, Y, H):
         Codebook = self.MakeCodebook(4)
