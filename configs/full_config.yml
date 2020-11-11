@@ -8,7 +8,7 @@ RE: # Route Estimator
   Hdom: time
   Pilotnum: 32
 ckpt:
-  redir: /data/siyu/NAIC/workspace/Y2HEstimator/TEST # path to checkpoint files of route estimator
-  medir: /data/siyu/NAIC/workspace/ModeEstimator/TEST # path to checkpoint files of mode estimator
+  redir: /data/siyu/NAIC/workspace/TEST/Route # path to checkpoint files of route estimator
+  medir: /data/siyu/NAIC/workspace/TEST/Mode # path to checkpoint files of mode estimator
 log:
   run_mode: test

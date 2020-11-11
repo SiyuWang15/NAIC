@@ -7,7 +7,7 @@ import sys
 import os 
 sys.path.append('..')
 from Estimators import ModeEstimator
-from data import get_Yp_modes
+from data import get_Yp_modes, get_Yp_modes_random
 
 class Y2ModeRunner():
     def __init__(self, config):
@@ -22,25 +22,29 @@ class Y2ModeRunner():
             raise NotImplementedError('Optimizer {} not understood.'.format(self.config.train.optimizer))
     
     def run(self):
+        Pn = self.config.OFDM.Pilotnum
         model = ModeEstimator(self.config.model.in_dim, self.config.model.h_dims, self.config.model.out_dim) # out_dim 2 or 3 
         device = 'cuda'
         model.to(device)
         optimizer = self.get_optimizer(model.parameters())
 
-        train_set, val_set = get_Yp_modes(self.config.OFDM.Pilotnum)
+        if self.config.train.random:
+            train_set, val_set = get_Yp_modes_random(Pn)
+        else:     
+            train_set, val_set = get_Yp_modes(Pn)
         train_dataloader = DataLoader(
             dataset=train_set, 
-            batch_size=128,
+            batch_size=self.config.train.batch_size,
             shuffle=False,
             num_workers=8,
-            drop_last=True,
+            drop_last=False,
             pin_memory=True)
         val_dataloader = DataLoader(
             dataset=val_set, 
-            batch_size=128,
+            batch_size=self.config.train.val_batch_size,
             shuffle=False,
             num_workers=8,
-            drop_last=True,
+            drop_last=False,
             pin_memory=True
         )
         best_acc = 0.0
@@ -59,12 +63,10 @@ class Y2ModeRunner():
             preds = torch.cat(preds, 0)
             modes = torch.cat(modes, 0)
             acc = (preds == modes).float().mean()
-            logging.info('epoch: {} || Acc: {}'.format(epoch, acc))
+            logging.info(f'epoch: {epoch} || Pn {Pn} || Acc: {acc}')
             if acc > best_acc:
                 best_acc = acc
-                torch.save(model.state_dict(), os.path.join(self.config.log.ckpt_dir, \
-                    'best_ckpt_P{}.pth'.format(self.config.OFDM.Pilotnum)))
-
+                torch.save(model.state_dict(), os.path.join(self.config.log.ckpt_dir, 'best_ckpt_P{Pn}.pth'))
 
             model.train()
             for (Yp, mode) in train_dataloader:
@@ -80,4 +82,4 @@ class Y2ModeRunner():
                 pred = torch.argmax(pred, 1, keepdim=False)
                 acc = (pred == label).float().mean()
                 if it % self.config.log.print_freq == 0:
-                    logging.info('iter: {} || loss: {}, acc: {}'.format(it, loss.item(), acc.item()))
+                    logging.info(f'iter: {it} || Pn {Pn} || loss: {loss.item()}, acc: {acc.item()}')

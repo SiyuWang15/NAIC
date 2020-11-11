@@ -1,15 +1,15 @@
 OFDM:
   Pilotnum: 8
   SNRdb: -1  # -1 mean random SNR
-  mode: 0
+  mode: -1
 log:
   print_freq: 500
   val_freq: 1
-  save_freq: 1
+  save_freq: -1
 model:
   h_dims: [512, 256, 64]
   in_dim: 1024
-  out_dim: 2
+  out_dim: 3
   act: sigmoid
   Hdom: time
 train:
@@ -17,6 +17,6 @@ train:
   lr: 0.002
   lr_decay: 0
   optimizer: adam
-  random: 0
-  val_batch_size: 1024
+  random: 1 # whether to use random generated dataset.
+  val_batch_size: 100
   n_epochs: 100

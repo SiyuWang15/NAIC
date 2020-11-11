@@ -7,7 +7,7 @@ import os
 import sys
 sys.path.append('..')
 from Estimators import RouteEstimator
-from data import get_YH_data
+from data import get_YH_data, get_YH_data_random
 
 class Y2HRunner():
     def __init__(self, config):
@@ -30,7 +30,10 @@ class Y2HRunner():
 
 
     def run(self):
-        train_set, val_set = get_YH_data(self.mode, self.Pn, self.config.model.Hdom)
+        if self.config.train.random:
+            train_set, val_set = get_YH_data_random(self.mode, self.Pn)
+        else:
+            train_set, val_set = get_YH_data(self.mode, self.Pn, self.config.model.Hdom)
         logging.info('Data Loaded!')
         # outdim = 2*2*32 if self.config.model.Hdom == 'time' else 256
         # assert self.config.model.out_dim == outdim  'out dimension not consistent with H domain'
@@ -71,7 +74,7 @@ class Y2HRunner():
                 nmse = self.NMSE(H_pred, H_label).item()
         
                 if it % self.config.log.print_freq == 0:
-                    logging.info(f'Epoch {epoch:>2d} || Iter {it:<4d} || MSE Loss: {nmse:.5f}')
+                    logging.info(f'Epoch {epoch:>2d} || Iter {it:<4d} || mode {self.mode} Pn {self.Pn} || MSE Loss: {nmse:.5f}')
                 it += 1
                         
             with torch.no_grad():

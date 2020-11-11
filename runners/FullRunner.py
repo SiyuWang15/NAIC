@@ -21,7 +21,7 @@ class FullRunner():
     
     def get_model(self, device):
         mode_estimator = ModeEstimator()
-        load_path = os.path.join(self.config.ckpt.medir, f'best_ckpt_P{self.Pn}.pth')
+        load_path = os.path.join(self.config.ckpt.medir, f'P{self.Pn}.pth')
         mode_estimator.load_state_dict(torch.load(load_path))
         mode_estimator.to(device)
         mode_estimator.eval()
@@ -29,7 +29,7 @@ class FullRunner():
         for mode in [0, 1, 2]:
             model = RouteEstimator(self.config.RE.in_dim, self.config.RE.out_dim, \
                     self.config.RE.h_dims, self.config.RE.act)
-            load_path = os.path.join(self.config.ckpt.redir, f'best_mode_{mode}_Pn_{self.Pn}.pth')
+            load_path = os.path.join(self.config.ckpt.redir, f'mode_{mode}_Pn_{self.Pn}.pth')
             model.load_state_dict(torch.load(load_path))
             model.to(device)
             model.eval()
@@ -50,7 +50,6 @@ class FullRunner():
             dp = os.path.join(self.config.log.log_dir, 'X_pre_2.bin')
         predX.tofile(dp)
         logging.info(f'results save in {dp}')
-
 
     def validation(self):
         device = 'cuda'
@@ -78,7 +77,12 @@ class FullRunner():
             modes = torch.argmax(modes, dim = -1)
             modes = np.asarray(modes.cpu())
             for i, mode in enumerate(modes):
+                # if mode == 1: 
+                #     mode = 0
+                #     modes[i] = 0
                 Yp_modes[mode].append(Yp[i])
+            for mode in [0,1,2]:
+                logging.info(f'number of Y in mode {mode}: {len(Yp_modes[mode])}')
             for mode in [0, 1, 2]:
                 if len(Yp_modes[mode]) == 0:
                     continue
@@ -86,8 +90,7 @@ class FullRunner():
                 H_est = route_estimators[mode](tmp_Yp)
                 H_est = np.asarray(H_est.cpu()) # Nsx256
                 H_modes[mode] = H_est
-            for mode in [0,1,2]:
-                logging.info(f'number of Y in mode {mode}: {len(H_modes[mode])}')
+            
             for i in range(len(Yp)):
                 mode = modes[i]
                 predH.append(H_modes[mode][cnt[mode]])
@@ -102,6 +105,9 @@ class FullRunner():
         Hf_est = transfer_H(H_est)
         _, predX = self.MLReceiver(Yd, Hf_est)
         return predX
+    
+    def parallel_MLReceiver(self, Y, H):
+        pass
 
     def MLReceiver(self, Y, H):
         Codebook = self.MakeCodebook(4)

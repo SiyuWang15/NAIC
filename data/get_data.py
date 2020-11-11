@@ -6,74 +6,10 @@ import os
 import logging
 import struct
 
+from .datasets import *
 from .Communication import *
 
 dataset_prefix = '/data/siyu/NAIC/'
-
-class dataset(Dataset):
-    def __init__(self, X, H, x_part, x_dim):
-        super().__init__()
-        assert len(X) == len(H)
-        self.X = X
-        self.H = H
-        self.x_part = x_part
-
-    def __len__(self):
-        return len(self.X)
-    
-    def __getitem__(self, index):
-        XX = self.X[index].astype('float')
-        HH = self.H[index]
-        temp_X = [XX[:512], XX[512:]]
-        YY = MIMO(temp_X, HH, 12, 0, 32) / 20.
-        return YY, XX[x_dim * x_part:x_dim * (x_part+1)]
-
-class RandomDataset(Dataset):
-    def __init__(self, H):
-        super().__init__()
-        self.H = H
-    
-    def __getitem__(self, index):
-        HH = self.H[index]
-        bits0 = np.random.binomial(1, 0.5, size = (128*4, ))
-        bits1 = np.random.binomial(1, 0.5, size = (128*4, ))
-        YY = MIMO([bits0, bits1], HH, 12, 0, 32) / 20.
-        XX = np.concatenate([bits0, bits1], 0)[:16]
-        return YY, XX
-    
-    def __len__(self):
-        return len(self.H)
-
-class Yp2modeDataset(Dataset):
-    def __init__(self, Yp_modes):
-        super().__init__()
-        self.Yp_modes = Yp_modes
-    
-    def __len__(self):
-        return len(self.Yp_modes)
-    
-    def __getitem__(self, index):
-        d = self.Yp_modes[index]
-        Yp = d[0]
-        mode = d[1]
-        return Yp, mode
-    
-class YHDataset(Dataset):
-    def __init__(self, Y, H):
-        self.Y = Y
-        self.H = H
-    
-    def __len__(self):
-        return len(self.Y)
-    
-    def __getitem__(self, index):
-        YY = self.Y[index, :]
-        HH = self.H[index, :]
-        return YY, HH
-
-class RandomYHDataset(Dataset):
-    def __init__(self, H):
-        raise NotImplementedError
 
 def get_Yp_modes(Pn):
     data_path = os.path.join(dataset_prefix, 'dataset/random_mode/Yp2mode_Pilot{}.npy'.format(Pn))
@@ -83,6 +19,16 @@ def get_Yp_modes(Pn):
     val = Yp[split:]
     train_set = Yp2modeDataset(train)
     val_set = Yp2modeDataset(val)
+    return train_set, val_set
+
+def get_Yp_modes_random(Pn):
+    data_path = os.path.join(dataset_prefix, 'dataset/H_data.npy')
+    H = np.load(data_path, allow_pickle = True)
+    split = int(len(H) * 0.9)
+    train = H[:split]
+    val = H[split:]
+    train_set = RandomYModeDataset(H, Pn)
+    val_set = RandomYModeDataset(H, Pn)
     return train_set, val_set
 
 def get_YH_data(mode, Pilotnum, H_domain = 'time'):
@@ -103,6 +49,16 @@ def get_YH_data(mode, Pilotnum, H_domain = 'time'):
     Yp_val = Yp[split:, :]
     train_set = YHDataset(Yp_train, H_train)
     val_set = YHDataset(Yp_val, H_val)
+    return train_set, val_set
+
+def get_YH_data_random(mode, Pn):
+    H_path = os.path.join(dataset_prefix, 'dataset/H_data.npy')
+    H = np.load(H_path)
+    split = int(0.9*len(H))
+    H_train = H[:split]
+    H_val = H[split:]
+    train_set = RandomYHDataset(H_train, mode, Pn)
+    val_set = RandomYHDataset(H_val, mode, Pn)
     return train_set, val_set
     
 def get_YX_data( x_part, x_dim, random = False):
@@ -149,13 +105,15 @@ def get_val_data(Pn): # generate validation dataset based on H_val.bin
     Yp = []
     Yd = []
     for i in range(len(H)):
-        SNRdb = random.randint(8, 12)
-        mode = random.randint(0, 2)
+        # SNRdb = random.randint(8, 12)
+        SNRdb = np.random.uniform(8, 12)
+        # mode = random.randint(0, 2)
+        mode = 0 if np.random.rand() < 0.5 else 2
         modes.append(mode)
         bits0 = np.random.binomial(1, 0.5, size = (128*4, ))
         bits1 = np.random.binomial(1, 0.5, size = (128*4, ))
         HH = H[i, :, :]
-        YY = MIMO([bits0, bits1], HH, SNRdb, mode, Pn) / 20
+        YY = MIMO([bits0, bits1], HH, SNRdb, mode, Pn) / 20.
         YY = np.reshape(YY,  [2, 2, 2, 256], order = 'F')
         YYp = YY[:, 0, :, :].reshape(1024, order = 'F')
         YYd = YY[:, 1, :, :].reshape(1024, order = 'F')
