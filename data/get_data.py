@@ -104,11 +104,12 @@ def get_val_data(Pn): # generate validation dataset based on H_val.bin
     X = []
     Yp = []
     Yd = []
+    th = 0.97 if Pn == 8 else 0.999
     for i in range(len(H)):
         # SNRdb = random.randint(8, 12)
         SNRdb = np.random.uniform(8, 12)
         # mode = random.randint(0, 2)
-        mode = 0 if np.random.rand() < 0.5 else 2
+        mode = 0 if np.random.rand() < th else 2
         modes.append(mode)
         bits0 = np.random.binomial(1, 0.5, size = (128*4, ))
         bits1 = np.random.binomial(1, 0.5, size = (128*4, ))

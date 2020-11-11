@@ -48,7 +48,7 @@ def run_full():
     set_logger(config)
     logging.info(config)
     if config.log.run_mode == 'validation':
-        config.RE.vaPilotnum=32
+        config.RE.Pilotnum=32
         logging.info('validating on Pn=32')
         runner = FullRunner(config)
         runner.validation()

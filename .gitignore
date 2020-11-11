@@ -10,7 +10,8 @@
 *.npy
 
 workspace/
-FinalResults
+Submit
+develop/
 simulation_code_v1/
 dataset/
 haojiang/
