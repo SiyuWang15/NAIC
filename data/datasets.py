@@ -64,14 +64,15 @@ class RandomYModeDataset(Dataset):
 
     def __getitem__(self, index):
         HH = self.H[index]
-        mode =  random.randint(0, 2)
+        # mode =  random.randint(0, 2)
+        mode = 0 if np.random.rand() < 0.8 else 2
         SNRdb = np.random.uniform(8, 12)
         bits0 = np.random.binomial(1, 0.5, size=(128*4, ))
         bits1 = np.random.binomial(1, 0.5, size=(128*4, ))
         YY = MIMO([bits0, bits1], HH, SNRdb, mode, self.Pn) / 20
         YY = np.reshape(YY, [2, 2, 2, 256], order='F')
         Yp = YY[:, 0, :, :].reshape(1024, order = 'F')
-        return Yp, mode
+        return Yp, int(mode != 0)
 
     
 class YHDataset(Dataset):
@@ -88,11 +89,12 @@ class YHDataset(Dataset):
         return YY, HH
 
 class RandomYHDataset(Dataset):
-    def __init__(self, H, mode, Pn):
+    def __init__(self, H, mode, Pn, cnn:bool=False):
         assert H.shape[1:] == (4, 32)
         self.H = H
         self.mode = mode
         self.Pn = Pn
+        self.cnn = cnn
         H_real=np.real(H)
         H_imag=np.imag(H)
         H_label=np.stack([H_imag, H_real], axis = 1)
@@ -110,5 +112,18 @@ class RandomYHDataset(Dataset):
         bits1 = np.random.binomial(1, 0.5, size=(128*4, ))
         YY = MIMO([bits0, bits1], HH, SNRdb, self.mode, self.Pn) / 20.
         YY = np.reshape(YY, [2, 2, 2, 256], order = 'F')
-        Yp = YY[:, 0, :, :].reshape(1024, order = 'F')
+        if self.cnn:
+            Yp = YY[:, 0, :, :].reshape(2, 16, 32, order = 'F')     # for cnn model, input Yp should be Nsx2x2x256
+        else:
+            Yp = YY[:, 0, :, :].reshape(1024, order = 'F')
         return Yp.astype('float32'), self.H_label[index].astype('float32')
+
+class RandomYHDataset4CNN(Dataset):
+    def __init__(self, H, mode, Pn):
+        assert H.shape[1:] == (4, 32)
+        self.H = H
+        self.mode = mode
+        self.Pn = Pn
+    
+    def __len__(self):
+        return len(self.H)

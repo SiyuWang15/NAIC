@@ -41,9 +41,10 @@ def bit_err(x_true, x_prob):
 def arg_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument('--slice', default=0, type = int, help='use which slice of X as label')
-    parser.add_argument('--mode', type=int)
-    parser.add_argument('--Pn', type=int)
-    parser.add_argument('--log_prefix', type=str)
+    parser.add_argument('--mode', default = 0, type=int)
+    parser.add_argument('--Pn', default = 32, type=int)
+    parser.add_argument('--log_prefix', default = 'default', type=str)
+    parser.add_argument('--runner', default = 'y2h', type = str)
     return parser
 
 def get_config(fp):

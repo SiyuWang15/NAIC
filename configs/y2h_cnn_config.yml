@@ -1,0 +1,22 @@
+OFDM:
+  Pilotnum: 32
+  SNRdb: -1
+  mode: 0
+log:
+  print_freq: 100
+  val_freq: 1
+  save_freq: 1
+model:
+  in_nc: 2
+  numblocks: [2,2,2,2]
+  out_dim: 256
+  act: sigmoid
+  Hdom: time
+train:
+  batch_size: 1024
+  lr: 0.002
+  lr_decay: 0
+  optimizer: adam
+  random: 1 
+  val_batch_size: 1024
+  n_epochs: 50

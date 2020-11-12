@@ -64,9 +64,11 @@ class Y2ModeRunner():
             modes = torch.cat(modes, 0)
             acc = (preds == modes).float().mean()
             logging.info(f'epoch: {epoch} || Pn {Pn} || Acc: {acc}')
+            torch.save(model.state_dict(), os.path.join(self.config.log.ckpt_dir, f'ckpt_{epoch}.pth'))
             if acc > best_acc:
                 best_acc = acc
-                torch.save(model.state_dict(), os.path.join(self.config.log.ckpt_dir, 'best_ckpt_P{Pn}.pth'))
+                torch.save(model.state_dict(), os.path.join(self.config.log.ckpt_dir, 'best_ckpt.pth'))
+            
 
             model.train()
             for (Yp, mode) in train_dataloader:
@@ -74,7 +76,6 @@ class Y2ModeRunner():
                 Yp = Yp.float().to(device)
                 label = mode.to(device)
                 pred = model(Yp).float()
-
                 loss = nn.CrossEntropyLoss()(pred, label)
                 optimizer.zero_grad()
                 loss.backward()

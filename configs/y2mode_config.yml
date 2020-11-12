@@ -3,13 +3,13 @@ OFDM:
   SNRdb: -1  # -1 mean random SNR
   mode: -1
 log:
-  print_freq: 500
+  print_freq: 100
   val_freq: 1
   save_freq: -1
 model:
   h_dims: [512, 256, 64]
   in_dim: 1024
-  out_dim: 3
+  out_dim: 2
   act: sigmoid
   Hdom: time
 train:
@@ -19,4 +19,4 @@ train:
   optimizer: adam
   random: 1 # whether to use random generated dataset.
   val_batch_size: 100
-  n_epochs: 100
+  n_epochs: 30

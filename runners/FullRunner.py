@@ -8,7 +8,7 @@ import time
 sys.path.append('..')
 from utils import *
 
-from Estimators import ModeEstimator, RouteEstimator
+from Estimators import ModeEstimator, RouteEstimator, CNNRouteEstimator
 from data import get_test_data, get_val_data
 
 
@@ -27,7 +27,10 @@ class FullRunner():
         mode_estimator.eval()
         route_estimators = []
         for mode in [0, 1, 2]:
-            model = RouteEstimator(self.config.RE.in_dim, self.config.RE.out_dim, \
+            if self.config.RE.model == 'CNN':
+                model = CNNRouteEstimator(self.config.RE.in_nc,  out_dim = self.config.RE.out_dim)
+            else:
+                model = RouteEstimator(self.config.RE.in_dim, self.config.RE.out_dim, \
                     self.config.RE.h_dims, self.config.RE.act)
             load_path = os.path.join(self.config.ckpt.redir, f'mode_{mode}_Pn_{self.Pn}.pth')
             model.load_state_dict(torch.load(load_path))
@@ -35,6 +38,12 @@ class FullRunner():
             model.eval()
             route_estimators.append(model)
         return mode_estimator, route_estimators
+
+    def run(self):
+        if self.config.log.run_mode == 'validation':
+            self.validation()
+        elif self.config.log.run_mode == 'testing':
+            self.test()
 
     def test(self):
         device = 'cuda'
@@ -53,6 +62,8 @@ class FullRunner():
 
     def validation(self):
         device = 'cuda'
+        description = r'SNRdb:9~11, mode ratio consistent with Y_1 and Y_2'
+        logging.info(description)
         mode_estimator, route_estimators = self.get_model(device)
         Yp, Yd, X_label, H_label = get_val_data(self.Pn) # H_label: Nsx256
         Yp = torch.Tensor(Yp).to(device)

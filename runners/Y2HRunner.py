@@ -6,14 +6,15 @@ import logging
 import os
 import sys
 sys.path.append('..')
-from Estimators import RouteEstimator
+from Estimators import RouteEstimator, CNNRouteEstimator
 from data import get_YH_data, get_YH_data_random
 
 class Y2HRunner():
-    def __init__(self, config):
+    def __init__(self, config, cnn:bool=False):
         self.config = config
         self.mode = config.OFDM.mode
         self.Pn = config.OFDM.Pilotnum
+        self.cnn = cnn
     
     def get_optimizer(self, parameters):
         if self.config.train.optimizer == 'adam':
@@ -30,8 +31,10 @@ class Y2HRunner():
 
 
     def run(self):
+        description = r'CNN Y2HEstimator, input dim: bsx2x16x32 (via order F reshape), output dim bsx256.'
+        logging.info(description)
         if self.config.train.random:
-            train_set, val_set = get_YH_data_random(self.mode, self.Pn)
+            train_set, val_set = get_YH_data_random(self.mode, self.Pn, self.cnn)
         else:
             train_set, val_set = get_YH_data(self.mode, self.Pn, self.config.model.Hdom)
         logging.info('Data Loaded!')
@@ -51,8 +54,11 @@ class Y2HRunner():
             num_workers=8,
             drop_last=False
         )
-        model = RouteEstimator(self.config.model.in_dim, self.config.model.out_dim, self.config.model.h_dims, \
-            self.config.model.act).to(device)
+        if self.cnn is False:
+            model = RouteEstimator(self.config.model.in_dim, self.config.model.out_dim, self.config.model.h_dims, \
+                self.config.model.act).to(device)
+        else:
+            model = CNNRouteEstimator(nc=self.config.model.in_nc, num_Blocks=self.config.model.numblocks, out_dim=self.config.model.out_dim).to(device)
         optimizer = self.get_optimizer(model.parameters())
         best_nmse = 1000.
 

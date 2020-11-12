@@ -51,14 +51,14 @@ def get_YH_data(mode, Pilotnum, H_domain = 'time'):
     val_set = YHDataset(Yp_val, H_val)
     return train_set, val_set
 
-def get_YH_data_random(mode, Pn):
+def get_YH_data_random(mode, Pn, cnn:bool):
     H_path = os.path.join(dataset_prefix, 'dataset/H_data.npy')
     H = np.load(H_path)
     split = int(0.9*len(H))
     H_train = H[:split]
     H_val = H[split:]
-    train_set = RandomYHDataset(H_train, mode, Pn)
-    val_set = RandomYHDataset(H_val, mode, Pn)
+    train_set = RandomYHDataset(H_train, mode, Pn, cnn)
+    val_set = RandomYHDataset(H_val, mode, Pn, cnn)
     return train_set, val_set
     
 def get_YX_data( x_part, x_dim, random = False):
@@ -106,8 +106,8 @@ def get_val_data(Pn): # generate validation dataset based on H_val.bin
     Yd = []
     th = 0.97 if Pn == 8 else 0.999
     for i in range(len(H)):
-        # SNRdb = random.randint(8, 12)
         SNRdb = np.random.uniform(8, 12)
+        # SNRdb = np.random.uniform(9, 11)
         # mode = random.randint(0, 2)
         mode = 0 if np.random.rand() < th else 2
         modes.append(mode)

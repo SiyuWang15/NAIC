@@ -1,0 +1,3 @@
+Conclusion:
+    no mode 1. mode 0 occupies most test data, mode 2 occupies very little cmponent.
+    
