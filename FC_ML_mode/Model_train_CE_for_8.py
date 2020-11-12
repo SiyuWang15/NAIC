@@ -133,12 +133,12 @@ for epoch in range(epochs):
         Y_train = np.reshape(Y_train, [batch_size, 2, 2, 2, 256], order='F').float()
         Y_input_train = Y_train[:,:,0,:,:]   # 取出接收导频信号，实部虚部*两根接收天线*256子载波
         Y_input_train = np.reshape(Y_input_train, [batch_size, 2*2*256])
-
+ 
         Ht_train = np.reshape(H_train,[batch_size,2,2,32], order='F') # time-domain channel
         Ht_label_train = np.zeros(shape=[batch_size, 2, 2, 2, 32], dtype=np.float32)
         Ht_label_train[:, 0, :, :, :] = Ht_train.real
         Ht_label_train[:, 1, :, :, :] = Ht_train.imag
-        Ht_label_train = np.reshape(Ht_label_train , [batch_size, 2*4*32])
+        Ht_label_train = np.reshape(Ht_label_train , [batch_size, 2*4*32] )
 
         Y_input_train = torch.Tensor(Y_input_train).cuda()
         Ht_label_train = torch.Tensor(Ht_label_train).cuda()

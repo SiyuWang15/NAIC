@@ -11,7 +11,7 @@ from Model_define_pytorch import FC_Estimation, NMSELoss, NMSELoss2, DatasetFold
 # from LS_CE import LS_Estimation,MMSE_Estimation, Interpolation_f
 
 from MLreceiver import MLReceiver, MakeCodebook
-from SoftMLreceiver import SoftMLReceiver
+# from SoftMLreceiver import SoftMLReceiver
 from generate_data import generatorXY
 
 # Parameters for training
@@ -35,9 +35,9 @@ group_num = 32
 G = 256 // group_num
 N_train_groups = len(group_index)
 mode = 0
-
+SNR = -1
 # 生成测试数据 Y：-1*2048； X：-1*1024； H：-1*4*32 时域信道
-Y, X, H = generatorXY(batch_num,H_val,Pilotnum,SNRdb=-1,mode=mode)
+Y, X, H = generatorXY(batch_num,H_val,Pilotnum,SNR=SNR,m=mode)
 
 
 
@@ -120,7 +120,8 @@ codebook = MakeCodebook(G)
 
 #### 基于ML恢复发送比特流X ####
 
-X_ML, X_bits = MLReceiver(Y,Hf_hat,codebook)
+# X_ML, X_bits = MLReceiver(Y,Hf_hat,codebook)
+X_ML, X_bits = MLReceiver(Y,Hf,codebook)
 
 # 可用的复数input：样本数 * 发射天线数 * 子载波数
 X_reshape = np.reshape(X, (-1, 2, 512))

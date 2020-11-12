@@ -1,6 +1,6 @@
 from utils import *
 
-from LS_CE import LS_Estimation,MMSE_Estimation, Interpolation_f
+# from LS_CE import LS_Estimation,MMSE_Estimation, Interpolation_f
 
 from Model_define_pytorch import FC_Estimation, FC_Detection, NMSELoss, DatasetFolder, DnCNN
 
@@ -11,7 +11,7 @@ import random
 import torch
 
 Pilot_num = 8
-mode = -1
+mode = 0
 # Parameters for training
 gpu_list = '4,5,6,7'
 os.environ["CUDA_VISIBLE_DEVICES"] = gpu_list
@@ -29,9 +29,9 @@ batch_num = Y.shape[0]
 
 # #### 通过部分频域信道估计全频域信道 ####
 in_dim = 1024
-h_dim = 2048
+h_dim = 4096
 out_dim = 256
-n_blocks =  4
+n_blocks =  2
 model = FC_Estimation(in_dim, h_dim, out_dim, n_blocks)
 model = torch.nn.DataParallel(model).cuda() 
 
