@@ -18,10 +18,11 @@ from generate_data import generatorXY
 gpu_list = '4,5,6,7'
 os.environ["CUDA_VISIBLE_DEVICES"] = gpu_list
 
-data1=open('/data/CuiMingyao/AI_competition/OFDMReceiver/H.bin','rb')
-H1=struct.unpack('f'*2*2*2*32*320000,data1.read(4*2*2*2*32*320000))
-H1=np.reshape(H1,[320000,2,4,32])
-H = H1[:,1,:,:]+1j*H1[:,0,:,:]
+# channel data for training and validation
+data1 = open('/data/CuiMingyao/AI_competition/OFDMReceiver/H.bin','rb')
+H1 = struct.unpack('f'*2*2*2*32*320000,data1.read(4*2*2*2*32*320000))
+H1 = np.reshape(H1,[320000,2,4,32])
+H_tra = H1[:,1,:,:]+1j*H1[:,0,:,:]   # time-domain channel for training
 
 data2 = open('/data/CuiMingyao/AI_competition/OFDMReceiver/H_val.bin','rb')
 H2 = struct.unpack('f'*2*2*2*32*2000,data2.read(4*2*2*2*32*2000))
@@ -38,7 +39,9 @@ mode = 0
 SNR = -1
 # 生成测试数据 Y：-1*2048； X：-1*1024； H：-1*4*32 时域信道
 Y, X, H = generatorXY(batch_num,H_val,Pilotnum,SNR=SNR,m=mode)
-
+# Y = Y.astype(np.float32)
+Y = torch.tensor(Y)
+H = torch.tensor(H)
 
 
 
@@ -57,23 +60,49 @@ model = torch.nn.DataParallel(model).cuda()  # model.module
 # Load weights
 model_path = model_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/FC_Estimation_Pilot'+str(Pilotnum)+'_mode'+str(mode)+'.pth.tar'
 model.load_state_dict(torch.load(model_path)['state_dict'])
+print(model_path)
 print("Weight Loaded!")
 
 
 # 通过网络估计全频域信道
 # complex ---> real + imag
-
-Y_reshape = np.reshape(Y, [batch_num, 2, 2, 2, 256], order='F')
+model.eval()
+Y_reshape = np.reshape(Y, [-1, 2, 2, 2, 256], order='F').float()
 Yp = Y_reshape[:,:,0,:,:]
-Yp = np.reshape(Yp, [batch_num, 2*2*256])
+Yp = np.reshape(Yp, [-1, 2*2*256])
 Yp = torch.Tensor(Yp).to('cuda')
 # print(Yp.shape)
-model.eval()
-Ht_output = model(Yp)
-Ht_output = Ht_output.detach().cpu().numpy()
-Ht_reshape = Ht_output.reshape([-1,2,4,32])
 
-Ht_complex = Ht_reshape[:,0,:,:] + 1j*Ht_reshape[:,1,:,:] 
+Ht_output = model(Yp)
+
+Ht_train = np.reshape(H,[batch_num,2,2,32], order='F') # time-domain channel
+Ht_label_train = np.zeros(shape=[batch_num, 2, 2, 2, 32], dtype=np.float32)
+Ht_label_train[:, 0, :, :, :] = Ht_train.real
+Ht_label_train[:, 1, :, :, :] = Ht_train.imag
+Ht_label_train = np.reshape(Ht_label_train , [batch_num, 2*4*32] , order = 'F')
+Ht_label_train = torch.Tensor(Ht_label_train).cuda()
+criterion = NMSELoss()
+loss = criterion(Ht_output, Ht_label_train)
+print(loss)
+
+
+
+
+
+'''
+Ht_output = Ht_output.detach().cpu().numpy()
+
+
+
+Ht_reshape = Ht_output.reshape([-1,2,2,2,32], order='F')
+Ht_complex = Ht_reshape[:,0,:,:,:] + 1j*Ht_reshape[:,1,:,:,:]
+Ht_complex = Ht_complex.reshape([-1, 4, 32], order='F')
+
+mse = np.sum((np.abs(Ht_complex - H))**2)
+power = np.sum((np.abs(H))**2)
+nmse = mse / power
+print(nmse)
+
 Hf_complex = np.fft.fft(Ht_complex, 256)/20
 Hf_reshape = np.reshape(Hf_complex, (-1,2,2,256), order='F')
 Hf_output = np.zeros(shape=[batch_num,2,2,2,256],dtype=np.float32)
@@ -89,10 +118,8 @@ Hf = np.reshape(Hf, (-1, 2,2,256), order='F')
 Hf_label = np.zeros(shape=[batch_num,2,2,2,256],dtype=np.float32)
 Hf_label[:,0,:,:,:] = Hf.real
 Hf_label[:,1,:,:,:] = Hf.imag
-criterion = NMSELoss2(reduction = 'mean')
 
-loss = criterion(torch.tensor(Hf_output).cuda(), torch.tensor(Hf_label).cuda())
-print(loss)
+
 
 # Hf_output1 = Hf_output.cuda().data.cpu().numpy()
 Hf_output1 = Hf_output
@@ -121,7 +148,7 @@ codebook = MakeCodebook(G)
 #### 基于ML恢复发送比特流X ####
 
 # X_ML, X_bits = MLReceiver(Y,Hf_hat,codebook)
-X_ML, X_bits = MLReceiver(Y,Hf,codebook)
+X_ML, X_bits = MLReceiver(Y,Hf_hat,codebook)
 
 # 可用的复数input：样本数 * 发射天线数 * 子载波数
 X_reshape = np.reshape(X, (-1, 2, 512))
@@ -160,3 +187,4 @@ print('Lovelive')
 
 
 
+'''

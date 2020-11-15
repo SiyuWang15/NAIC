@@ -86,32 +86,7 @@ if load_flag:
     print("Weight Loaded!")
 
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-'''
-# generate data fro training
-data_load_address = '/data/CuiMingyao/AI_competition/OFDMReceiver/'
-Y_train = np.load(data_load_address+'training_Y_P='+str(Pilotnum)+'_mode='+str(mode)+'.npy')
 
-# Y_train = Y_train[:300000,:]
-N_train = Y_train.shape[0]
-Y_train = Y_train.astype(np.float32)
-
-# Obtain input data
-Y_train = np.reshape(Y_train, [-1, 2, 2, 2, 256], order='F')
-Y_input_train = Y_train[:,:,0,:,:]   # 取出接收导频信号，实部虚部*两根接收天线*256子载波
-Y_input_train = np.reshape(Y_input_train, [N_train, 2*2*256])
-
-# Obtain label data for training
-Ht = np.reshape(H_tra,[-1,2,2,32], order='F') # time-domain channel
-Ht_label_train = np.zeros(shape=[N_train, 2, 2, 2, 32], dtype=np.float32)
-Ht_label_train[:, 0, :, :, :] = Ht.real
-Ht_label_train[:, 1, :, :, :] = Ht.imag
-Ht_label_train = np.reshape(Ht_label_train , [-1, 2*4*32])
-
-# dataLoader for training
-train_dataset = DatasetFolder(Y_input_train, Ht_label_train)
-train_loader = torch.utils.data.DataLoader(
-    train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True, drop_last=True)
-'''
 # test_data = generator(2000,H_tra,Pilotnum)
 train_dataset  = RandomDataset(H_tra,Pilot_num=Pilotnum,SNRdb=SNRdB,mode=mode)
 train_dataloader = DataLoader(dataset = train_dataset, batch_size = batch_size, shuffle = False, num_workers = num_workers, drop_last = True, pin_memory = True)
@@ -130,6 +105,7 @@ for epoch in range(epochs):
 
     for it, (Y_train, H_train, X_train) in enumerate(train_dataloader):
 
+        # print(Y_train)
         Y_train = np.reshape(Y_train, [batch_size, 2, 2, 2, 256], order='F').float()
         Y_input_train = Y_train[:,:,0,:,:]   # 取出接收导频信号，实部虚部*两根接收天线*256子载波
         Y_input_train = np.reshape(Y_input_train, [batch_size, 2*2*256])
@@ -138,7 +114,7 @@ for epoch in range(epochs):
         Ht_label_train = np.zeros(shape=[batch_size, 2, 2, 2, 32], dtype=np.float32)
         Ht_label_train[:, 0, :, :, :] = Ht_train.real
         Ht_label_train[:, 1, :, :, :] = Ht_train.imag
-        Ht_label_train = np.reshape(Ht_label_train , [batch_size, 2*4*32] )
+        Ht_label_train = np.reshape(Ht_label_train , [batch_size, 2*4*32] , order = 'F')
 
         Y_input_train = torch.Tensor(Y_input_train).cuda()
         Ht_label_train = torch.Tensor(Ht_label_train).cuda()
@@ -162,8 +138,44 @@ for epoch in range(epochs):
             optimizer.param_groups[0]['lr'] =  optimizer.param_groups[0]['lr'] * 0.2
         if optimizer.param_groups[0]['lr'] < lr_threshold:
             optimizer.param_groups[0]['lr'] = lr_threshold
+    
+    model.eval()
+    print('lr:%.4e'%optimizer.param_groups[0]['lr']) 
+    test_data = generatorXY(2000,H_val,Pilotnum,SNRdB, mode)
+    Y_test, X_test, H_test = test_data
+    Ns = Y_test.shape[0]
+    # Obtain input data based on the LS channel estimation
+
+    Y_reshape = np.reshape(Y_test, [-1, 2, 2, 2, 256], order='F')
+    Yp = Y_reshape[:,:,0,:,:]
+    Yp = np.reshape(Yp, [-1, 2*2*256])
+    Yp = torch.Tensor(Yp).to('cuda')
+
+    H_hat_test = model(Yp)
 
 
+    H_label_test =  np.zeros(shape=[Ns,2,4,32],dtype=np.float32)
+    H_label_test[:,0,:,:] = H_test.real
+    H_label_test[:,1,:,:] = H_test.imag
+    H_label_test = np.reshape(H_label_test , [-1, 2*4*32], order = 'F')
+    H_label_test = torch.Tensor(H_label_test).to('cuda')
+
+
+    average_loss = criterion(H_hat_test, H_label_test).item()
+    print('NMSE %.4f' % average_loss)
+    if average_loss < best_loss:
+        # model save
+        modelSave =  '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/FC_Estimation_Pilot'+str(Pilotnum)+'_mode'+str(mode)+'.pth.tar'
+        # try:
+        # torch.save({'state_dict': model.state_dict(), }, modelSave, _use_new_zipfile_serialization=False)
+        # except:
+        #     torch.save({'state_dict': model.module.state_dict(), }, modelSave,_use_new_zipfile_serialization=False)
+        print('Model saved!')
+        best_loss = average_loss
+    
+    model.train()
+
+'''
     # 验证集
     model.eval()
     total_loss = 0
@@ -182,7 +194,7 @@ for epoch in range(epochs):
         Ht_label_test = np.zeros(shape=[N_test, 2, 2, 2, 32], dtype=np.float32)
         Ht_label_test[:, 0, :, :, :] = Ht_test.real
         Ht_label_test[:, 1, :, :, :] = Ht_test.imag
-        Ht_label_test = np.reshape(Ht_label_test , [N_test, 2*4*32])
+        Ht_label_test = np.reshape(Ht_label_test , [N_test, 2*4*32], order = 'F')
         Ht_label_test = torch.Tensor(Ht_label_test).cuda()    
 
 
@@ -200,3 +212,4 @@ for epoch in range(epochs):
     
     model.train()
 
+'''

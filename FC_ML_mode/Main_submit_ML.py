@@ -41,7 +41,7 @@ model_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/FC_Estimati
 model.load_state_dict(torch.load(model_path)['state_dict'])
 print("Weight Loaded!")
 
-
+model.eval()
 
 # 通过网络估计全频域信道
 # complex ---> real + imag
@@ -51,10 +51,11 @@ Yp = Y_reshape[:,:,0,:,:]
 Yp = np.reshape(Yp, [batch_num, 2*2*256])
 Yp = torch.Tensor(Yp).to('cuda')
 # print(Yp.shape)
-model.eval()
+
 Ht_output = model(Yp)
 Ht_output = Ht_output.detach().cpu().numpy()
-Ht_reshape = Ht_output.reshape([-1,2,4,32])
+
+Ht_reshape = Ht_output.reshape([-1,2,4,32], order='F')
 
 Ht_complex = Ht_reshape[:,0,:,:] + 1j*Ht_reshape[:,1,:,:] 
 Hf_complex = np.fft.fft(Ht_complex, 256)/20

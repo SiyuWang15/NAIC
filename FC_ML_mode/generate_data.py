@@ -42,8 +42,8 @@ def generatorXY(batch, H, Pilot_num,SNR,m):
         bits0 = np.random.binomial(n=1, p=0.5, size=(128 * 4,))
         bits1 = np.random.binomial(n=1, p=0.5, size=(128 * 4,))
         X = [bits0, bits1]
-        temp = np.random.randint(0, len(H))
-        # temp = row
+        # temp = np.random.randint(0, len(H))
+        temp = row
         HH = H[temp]
         if SNR == -1:
             SNRdb = np.random.uniform(8, 12)
@@ -54,7 +54,7 @@ def generatorXY(batch, H, Pilot_num,SNR,m):
             mode = np.random.randint(0, 3)
         else:
             mode = m
-            # print(mode)
+        # print(SNRdb, mode)
         YY = MIMO(X, HH, SNRdb, mode, Pilot_num) / 20  ###
         XX = np.concatenate((bits0, bits1), 0)
         input_labels.append(XX)
@@ -86,7 +86,7 @@ class RandomDataset():
             mm = np.random.randint(0, 3)
         YY = MIMO([bits0, bits1], HH, SS, mm, self.Pilot_num)/20
         XX = np.concatenate([bits0, bits1], 0)
-        return YY, HH, XX
+        return YY, XX, HH
 
     def __len__(self):
         return len(self.H)
