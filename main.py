@@ -46,21 +46,35 @@ def run_y2mode(args):
     runner = Y2ModeRunner(config)
     runner.run()
 
+def run_y2x(args):
+    config = get_config('./configs/y2x_config.yml')
+    config.OFDM.Pilotnum = args.Pn
+    config.log.log_prefix = f'workspace/Y2XEstimator/{args.log_prefix}'
+    config.log.log_dir = os.path.join(config.log.log_prefix, f'mode_{args.mode}_Pn_{args.Pn}')
+    config.log.ckpt_dir = os.path.join(config.log.log_dir, 'checkpoints')
+    os.makedirs(config.log.ckpt_dir)
+    set_logger(config)
+    logging.info(config)
+    runner = Y2XRunner(config)
+    runner.run()
+
 
 def run_full(args):
     config = get_config('./configs/full_config.yml')
+    config.RE.Pilotnum = args.Pn
     config.log.run_mode = args.runner # validation or testing
     config.log.log_dir = os.path.join('workspace', config.log.run_mode, args.log_prefix, f'Pn_{args.Pn}')
     os.makedirs(config.log.log_dir)
     set_logger(config)
     logging.info(config)
     if config.log.run_mode == 'validation':
-        logging.info(f'validating on Pn={args.Pn}')
-        runner = FullRunner
+        # logging.info(f'validating on Pn={args.Pn}')
+        runner = FullRunner(config)
+        runner.run()
     elif config.log.run_mode == 'testing':
         logging.info(f'testing on Pn={args.Pn}')
         runner = FullRunner(config)
-        runner.test()
+        runner.simple_test()
 
 if __name__ == "__main__":
     parser = arg_parser()
@@ -75,3 +89,5 @@ if __name__ == "__main__":
         run_full(args)
     elif args.runner == 'testing':
         run_full(args)
+    elif args.runner == 'y2x':
+        run_y2x(args)

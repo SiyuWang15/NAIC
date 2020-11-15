@@ -6,7 +6,7 @@ import logging
 import os
 import sys
 sys.path.append('..')
-from Estimators import RouteEstimator, CNNRouteEstimator
+from Estimators import RouteEstimator, CNNRouteEstimator, ResNetRouteEstimator
 from data import get_YH_data, get_YH_data_random
 
 class Y2HRunner():
@@ -31,8 +31,21 @@ class Y2HRunner():
 
 
     def run(self):
-        description = r'CNN Y2HEstimator, input dim: bsx2x16x32 (via order F reshape), output dim bsx256.'
-        logging.info(description)
+        device = 'cuda'
+        # description = r'CNN Y2HEstimator, input dim: bsx2x16x32 (via order F reshape), output dim bsx256.'
+        # logging.info(description)
+        if self.cnn is False:
+            model = RouteEstimator(self.config.model.in_dim, self.config.model.out_dim, self.config.model.h_dims, \
+                self.config.model.act).to(device)
+        else:
+            # model = CNNRouteEstimator(nc=self.config.model.in_nc, num_Blocks=self.config.model.numblocks, out_dim=self.config.model.out_dim)
+            # model.load_state_dict(torch.load('/data/siyu/NAIC/workspace/CNNY2HEstimator/1112-12-59-18/mode_0_Pn_32/checkpoints/best.pth'))
+            # model.to(device)
+            # logging.info('finetune from Pn 32.')
+            logging.info('ResNet34 model')
+            model = ResNetRouteEstimator(34).to(device)
+        optimizer = self.get_optimizer(model.parameters())
+        
         if self.config.train.random:
             train_set, val_set = get_YH_data_random(self.mode, self.Pn, self.cnn)
         else:
@@ -40,7 +53,6 @@ class Y2HRunner():
         logging.info('Data Loaded!')
         # outdim = 2*2*32 if self.config.model.Hdom == 'time' else 256
         # assert self.config.model.out_dim == outdim  'out dimension not consistent with H domain'
-        device = 'cuda'
         train_loader = DataLoader(
             train_set, 
             batch_size=self.config.train.batch_size, 
@@ -50,16 +62,12 @@ class Y2HRunner():
         )
         val_loader = DataLoader(
             val_set, 
+            shuffle=False,
             batch_size=self.config.train.val_batch_size, 
             num_workers=8,
             drop_last=False
         )
-        if self.cnn is False:
-            model = RouteEstimator(self.config.model.in_dim, self.config.model.out_dim, self.config.model.h_dims, \
-                self.config.model.act).to(device)
-        else:
-            model = CNNRouteEstimator(nc=self.config.model.in_nc, num_Blocks=self.config.model.numblocks, out_dim=self.config.model.out_dim).to(device)
-        optimizer = self.get_optimizer(model.parameters())
+        
         best_nmse = 1000.
 
         logging.info('Everything prepared well, start to train...')
@@ -80,7 +88,7 @@ class Y2HRunner():
                 nmse = self.NMSE(H_pred, H_label).item()
         
                 if it % self.config.log.print_freq == 0:
-                    logging.info(f'Epoch {epoch:>2d} || Iter {it:<4d} || mode {self.mode} Pn {self.Pn} || MSE Loss: {nmse:.5f}')
+                    logging.info(f'Epoch {epoch:>2d} || Iter {it} || mode {self.mode} Pn {self.Pn} || MSE Loss: {nmse:.5f}')
                 it += 1
                         
             with torch.no_grad():

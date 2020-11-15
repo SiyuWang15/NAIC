@@ -4,36 +4,25 @@ import torch
 from torch.utils.data import Dataset
 from .Communication import MIMO
 
-class YXdataset(Dataset):
-    def __init__(self, X, H, x_part, x_dim):
+class RandomYXDataset(Dataset):
+    def __init__(self, H, mode, Pn):
         super().__init__()
-        assert len(X) == len(H)
-        self.X = X
-        self.H = H
-        self.x_part = x_part
-
-    def __len__(self):
-        return len(self.X)
-    
-    def __getitem__(self, index):
-        XX = self.X[index].astype('float')
-        HH = self.H[index]
-        temp_X = [XX[:512], XX[512:]]
-        YY = MIMO(temp_X, HH, 12, 0, 32) / 20.
-        return YY, XX[x_dim * x_part:x_dim * (x_part+1)]
-
-class RandomDataset(Dataset):
-    def __init__(self, H):
-        super().__init__()
+        self.mode = mode
+        self.Pn = Pn
         self.H = H
     
     def __getitem__(self, index):
+        SNRdb = np.random.uniform(8, 12)
         HH = self.H[index]
-        bits0 = np.random.binomial(1, 0.5, size = (128*4, ))
-        bits1 = np.random.binomial(1, 0.5, size = (128*4, ))
-        YY = MIMO([bits0, bits1], HH, 12, 0, 32) / 20.
-        XX = np.concatenate([bits0, bits1], 0)[:16]
-        return YY, XX
+        bits0 = np.random.binomial(1, 0.5, size=(128*4,))
+        bits1 = np.random.binomial(1, 0.5, size=(128*4,))
+        YY = MIMO([bits0, bits1], HH, SNRdb, self.mode, self.Pn) / 20.
+        YY = np.reshape(YY, [2, 2, 2, 256], order = 'F')
+        YY = np.reshape(YY, [4, 2, 256], order = 'F') # channel 4: real and imag, pilot and data
+        YY = np.reshape(YY, [4, 16, 32], order = 'F') 
+        XX = np.stack([bits0, bits1], axis = 0) # 2x512 channel 2:real and imag
+        XX = np.reshape(XX, [2, 16, 32])
+        return YY.astype('float32'), XX.astype('float32')
     
     def __len__(self):
         return len(self.H)
@@ -75,18 +64,18 @@ class RandomYModeDataset(Dataset):
         return Yp, int(mode != 0)
 
     
-class YHDataset(Dataset):
-    def __init__(self, Y, H):
-        self.Y = Y
-        self.H = H
+# class YHDataset(Dataset):
+#     def __init__(self, Y, H):
+#         self.Y = Y
+#         self.H = H
     
-    def __len__(self):
-        return len(self.Y)
+#     def __len__(self):
+#         return len(self.Y)
     
-    def __getitem__(self, index):
-        YY = self.Y[index, :]
-        HH = self.H[index, :]
-        return YY, HH
+#     def __getitem__(self, index):
+#         YY = self.Y[index, :]
+#         HH = self.H[index, :]
+#         return YY, HH
 
 class RandomYHDataset(Dataset):
     def __init__(self, H, mode, Pn, cnn:bool=False):
@@ -113,7 +102,7 @@ class RandomYHDataset(Dataset):
         YY = MIMO([bits0, bits1], HH, SNRdb, self.mode, self.Pn) / 20.
         YY = np.reshape(YY, [2, 2, 2, 256], order = 'F')
         if self.cnn:
-            Yp = YY[:, 0, :, :].reshape(2, 16, 32, order = 'F')     # for cnn model, input Yp should be Nsx2x2x256
+            Yp = YY[:, 0, :, :].reshape(2, 16, 32, order = 'F') + np.random.randn(2, 16, 32) * 0.05     # for cnn model, input Yp should be Nsx2x2x256
         else:
             Yp = YY[:, 0, :, :].reshape(1024, order = 'F')
         return Yp.astype('float32'), self.H_label[index].astype('float32')

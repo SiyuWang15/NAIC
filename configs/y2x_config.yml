@@ -1,22 +1,20 @@
 OFDM:
-  Pilotnum: 32
-  SNRdb: 25
+  Pilotnum: -1
+  SNRdb: -1
   mode: 0
 log:
-  log_prefix: debug
   print_freq: 100
   val_freq: 20
-  save_freq: 10000
+  save_freq: 1
 model:
-  h_dim: [1024, 512, 256]
-  in_dim: 2048
-  n_blocks: -1
-  out_dim: 64
+  in_ch: 4
+  out_ch: 2
+  numblocks: [2,2,2,2]
 train:
-  batch_size: 1024
-  lr: 0.002
+  batch_size: 512
+  lr: 0.02
   lr_decay: 0
   optimizer: adam
   random: 0
-  val_batch_size: 1024
+  val_batch_size: 1000
   n_epochs: 100

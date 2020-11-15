@@ -1,6 +1,6 @@
 # config for full runner
 ME:
-  out_dim: 3
+  out_dim: 2
 RE: # Route Estimator
   model: CNN # CNN or MLP
   # for CNN model
@@ -13,7 +13,8 @@ RE: # Route Estimator
   Hdom: time
   Pilotnum: 32
 ckpt:
-  redir: /data/siyu/NAIC/Submit/checkpoints/Route # path to checkpoint files of route estimator
-  medir: /data/siyu/NAIC/Submit/checkpoints/Mode # path to checkpoint files of mode estimator
+  models: [cnn, resnet, cnn]
+  redir: [1112-12-59-18, 1113-16-57-39, 1114-23-39-47] # path to checkpoint files of route estimators 
+  # medir: /data/siyu/NAIC/Submit2/checkpoints/Mode # path to checkpoint files of mode estimator
 log:
   run_mode: validation  # validation or testing
