@@ -102,7 +102,7 @@ class RandomYHDataset(Dataset):
         YY = MIMO([bits0, bits1], HH, SNRdb, self.mode, self.Pn) / 20.
         YY = np.reshape(YY, [2, 2, 2, 256], order = 'F')
         if self.cnn:
-            Yp = YY[:, 0, :, :].reshape(2, 16, 32, order = 'F') + np.random.randn(2, 16, 32) * 0.05     # for cnn model, input Yp should be Nsx2x2x256
+            Yp = YY[:, 0, :, :].reshape(2, 16, 32, order = 'F')   # for cnn model, input Yp should be Nsx2x2x256
         else:
             Yp = YY[:, 0, :, :].reshape(1024, order = 'F')
         return Yp.astype('float32'), self.H_label[index].astype('float32')

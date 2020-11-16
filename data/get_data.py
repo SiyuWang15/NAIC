@@ -121,7 +121,8 @@ def get_val_data(Pn): # generate validation dataset based on H_val.bin
     return Yp, Yd,  X, H_label
 
 def get_Pilot(Pn):
-    pass
+    Pilot = np.asarray(np.fromfile(f'/data/siyu/NAIC/dataset/X_Pilot_{Pn}.bin', dtype=np.bool), dtype='float32')
+    return Pilot
 
 def get_simple_val_data(mode, Pn):
     H_path = os.path.join(dataset_prefix, 'dataset/H_val.bin')

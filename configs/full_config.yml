@@ -11,10 +11,9 @@ RE: # Route Estimator
   out_dim: 256
   act: sigmoid
   Hdom: time
-  Pilotnum: 32
+  Pilotnum: 8
 ckpt:
   models: [cnn, resnet, cnn]
   redir: [1112-12-59-18, 1113-16-57-39, 1114-23-39-47] # path to checkpoint files of route estimators 
-  # medir: /data/siyu/NAIC/Submit2/checkpoints/Mode # path to checkpoint files of mode estimator
 log:
   run_mode: validation  # validation or testing
