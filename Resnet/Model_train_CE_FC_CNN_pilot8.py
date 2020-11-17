@@ -142,13 +142,13 @@ for epoch in range(epochs):
         Hf_train_output = Hf_train_output.reshape(batch_size, 2, 4, 256)
         
         Hf_input_train = Hf_train_output
-        Yp_input_train = Y_input_train[:,:,0,:,:] 
+        Yp_input_train = Y_input_train[:,:,1,:,:] 
         Yp_input_train = Yp_input_train.cuda()
 
-        input = torch.cat([Yp_input_train, Hf_input_train], 2)
-        # input = torch.reshape(input, [batch_size, 1, 12, 256])
+        net_input = torch.cat([Yp_input_train, Hf_input_train], 2)
+        # net_input = torch.reshape(net_input, [batch_size, 1, 12, 256])
         
-        Ht_train_refine = CNN(input)
+        Ht_train_refine = CNN(net_input)
 
         #第二级网络输出
         Ht_train_refine = Ht_train_refine.reshape(batch_size, 2, 4, 32)
@@ -212,13 +212,13 @@ for epoch in range(epochs):
             Hf_test_output = Hf_test_output.reshape(Ns, 2, 4, 256)
             
             Hf_input_test = Hf_test_output
-            Yp_input_test = Y_input_test[:,:,0,:,:] 
+            Yp_input_test = Y_input_test[:,:,1,:,:] 
             Yp_input_test = Yp_input_test.cuda()
 
-            input = torch.cat([Yp_input_test, Hf_input_test], 2)
-            # input = torch.reshape(input, [Ns, 1, 12, 256])
+            net_input = torch.cat([Yp_input_test, Hf_input_test], 2)
+            # net_input = torch.reshape(net_input, [Ns, 1, 12, 256])
             
-            Ht_test_refine = CNN(input)
+            Ht_test_refine = CNN(net_input)
 
             #第二级网络输出
             Ht_test_refine = Ht_test_refine.reshape(Ns, 2, 4, 32)
