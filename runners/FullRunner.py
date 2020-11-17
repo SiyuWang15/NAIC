@@ -10,8 +10,8 @@ import time
 sys.path.append('..')
 from utils import *
 
-from Estimators import ModeEstimator, RouteEstimator, CNNRouteEstimator, ResNetRouteEstimator
-from data import get_test_data, get_val_data, get_simple_val_data, get_Pilot
+from Estimators import RouteEstimator, CNNRouteEstimator, ResNetRouteEstimator
+from data import get_test_data, get_val_data, get_simple_val_data
 
 
 r'''This runner is only used to DO the whole test procedure, not used to train model'''
@@ -20,63 +20,48 @@ class FullRunner():
     def __init__(self, config):
         self.config = config
         self.Pn = self.config.RE.Pilotnum
+    
+    def get_model(self, device):
+        mode_estimator = ModeEstimator(out_dim=self.config.ME.out_dim)
+        load_path = os.path.join(self.config.ckpt.medir, f'P{self.Pn}.pth')
+        mode_estimator.load_state_dict(torch.load(load_path))
+        mode_estimator.to(device)
+        mode_estimator.eval()
+        route_estimators = []
+        for mode in [0, 1, 2]:
+            if self.config.RE.model == 'CNN':
+                model = CNNRouteEstimator(self.config.RE.in_nc,  out_dim = self.config.RE.out_dim)
+            else:
+                model = RouteEstimator(self.config.RE.in_dim, self.config.RE.out_dim, \
+                    self.config.RE.h_dims, self.config.RE.act)
+            load_path = os.path.join(self.config.ckpt.redir, f'mode_{mode}_Pn_{self.Pn}.pth')
+            model.load_state_dict(torch.load(load_path))
+            model.to(device)
+            model.eval()
+            route_estimators.append(model)
+        return mode_estimator, route_estimators
 
     def run(self):
         if self.config.log.run_mode == 'validation':
             self.validation()
         elif self.config.log.run_mode == 'testing':
             self.test()
-        
-    def get_models(self, device):
-        modelkv = {'cnn': CNNRouteEstimator,  'resnet': ResNetRouteEstimator, 'mlp': RouteEstimator}
-        assert len(self.config.ckpt.redir) == len(self.config.ckpt.models)
-        models = []
-        for modelname, ckpt_fp in zip(self.config.ckpt.models, self.config.ckpt.redir):
-            if modelname == 'cnn':
-                M = CNNRouteEstimator()
-            elif modelname == 'resnet':
-                M = ResNetRouteEstimator(34)
-            fp = os.path.join('/data/siyu/NAIC/workspace/CNNY2HEstimator/', ckpt_fp, 'mode_0_Pn_8/checkpoints/best.pth')
-            M.load_state_dict(torch.load(fp))
-            M.to(device)
-            M.eval()
-            models.append(M)
-        return models
     
-    def validation(self):
-        device = 'cuda'
-        logging.info('boosting')
-        route_estimators = self.get_models(device)
-        Yp, Yd, X_label, H_label = get_simple_val_data(mode = 0, Pn = self.Pn) # Yp, Yd Nsx1024
-        Pilot = get_Pilot(self.Pn)
-        predXds = []
-        accXp = []
-
-        for i, model in enumerate(route_estimators):
-            cnn = True if (self.config.ckpt.models[i] == 'cnn' or 'resnet') else False
-            predXp, predXd, predH = self.single_validation(model, Yp.copy(), Yd.copy(), device, cnn)
-            acc = (predXp == Pilot).astype('float32').mean(-1)
-            nmse = self.NMSE(predH, H_label)
-            acc_avg = acc.mean()
-            logging.info(f'model {self.config.ckpt.models[i]} performance: acc {acc_avg} || nmse {nmse}')
-            predXds.append(predXd)
-            accXp.append(acc)
-    
-    def single_validation(self, route_estimator, Yp, Yd, device, cnn):
-        Yp2 = Yp.copy()
-        if cnn is True:
-            Yp = np.reshape(Yp, [len(Yp), 2, 16, 32], order = 'F')
-        Yp = torch.Tensor(Yp).to(device)
-        predH = route_estimator(Yp).detach().cpu().numpy()
+    def simple_run(self):
+        RE_dir = '/data/siyu/NAIC/workspace/CNNY2HEstimator/1117-12-27-11/mode_0_Pn_8/checkpoints/best.pth'
+        # RE_dir = '/data/siyu/NAIC/workspace/CNNY2HEstimator/1112-12-59-18/mode_0_Pn_32/checkpoints/best.pth'
+        route_estimator = ResNetRouteEstimator(34)
+        # route_estimator = CNNRouteEstimator(self.config.RE.in_nc, out_dim=self.config.RE.out_dim)
+        route_estimator.load_state_dict(torch.load(RE_dir))
+        Yp, Yd, X_label, H_label = get_simple_val_data(0, self.Pn)
+        Yp = torch.Tensor(Yp)
+        H_pred = route_estimator(Yp).detach().numpy()
+        nmse = self.NMSE(H_pred, H_label)
         Yd = transfer_Y(Yd)
-        Hf = transfer_H(predH)
-        _, predXd = self.MLReceiver(Yd, Hf)
-        Yp2 = transfer_Y(Yp2)
-        _, predXp = self.MLReceiver(Yp2, Hf)
-        return predXp, predXd, predH
-        # acc = (pred_X == X_label).astype('float32').mean()
-        # accp = (predXp == Pilot).astype()
-        # logging.info(f'Results of validation at {self.config.boosting[i]} || {self.config.ckpt.redir[i]} \n acc: {acc}, nmse: {nmse}')
+        Hf = transfer_H(H_pred)
+        _, pred_X = self.MLReceiver(Yd, Hf)
+        acc = (pred_X == X_label).astype('float32').mean()
+        logging.info(f'acc: {acc}, nmse: {nmse}')
     
     def simple_test(self):
         RE_dir = '/data/siyu/NAIC/workspace/CNNY2HEstimator/1113-16-57-39/mode_0_Pn_8/checkpoints/best.pth'
@@ -92,10 +77,79 @@ class FullRunner():
         predX.tofile(dp)
 
 
+    def test(self):
+        device = 'cuda'
+        mode_estimator, route_estimators = self.get_model(device)
+        Yp, Yd = get_test_data(self.Pn)
+        Yp = torch.Tensor(Yp).to(device)
+        predH = self.estimateH(Yp, mode_estimator, route_estimators)
+        predX = self.estimateX(Yd, predH)
+        predX = np.array(np.floor(predX+0.5), dtype = np.bool)
+        if self.Pn == 32:
+            dp = os.path.join(self.config.log.log_dir, 'X_pre_1.bin')
+        elif self.Pn == 8:
+            dp = os.path.join(self.config.log.log_dir, 'X_pre_2.bin')
+        predX.tofile(dp)
+        logging.info(f'results save in {dp}')
+
+    def validation(self):
+        device = 'cuda'
+        description = r'SNRdb:9~11, mode ratio consistent with Y_1 and Y_2'
+        logging.info(description)
+        mode_estimator, route_estimators = self.get_model(device)
+        Yp, Yd, X_label, H_label = get_val_data(self.Pn) # H_label: Nsx256
+        Yp4RE = np.reshape(Yp, [len(Yp), 2, 16, 32], order = 'F')
+        Yp4RE = torch.Tensor(Yp4RE).to(device)
+        Yp4ME = torch.Tensor(Yp.copy()).to(device)
+        predH = self.estimateH(Yp4ME, Yp4RE, mode_estimator, route_estimators) # Nsx256
+        logging.info(f'nmse of predicted H: {self.NMSE(predH, H_label)}')
+        predX = self.estimateX(Yd, predH)
+        acc = (predX == X_label).astype('float32').mean()
+        logging.info(acc)
+
     def NMSE(self, H_pred, H_label):
         mse = np.power(H_pred-H_label, 2).sum()
         norm = np.power(H_label, 2).sum()
         return mse / norm
+    
+    def estimateH(self, Yp4ME, Yp4RE, mode_estimator, route_estimators):
+        Yp_modes = [[],[],[]]
+        H_modes = [[],[],[]]
+        predH = []
+        cnt = [0,0,0]
+        with torch.no_grad():
+            modes = mode_estimator(Yp4ME)
+            modes = torch.argmax(modes, dim = -1)
+            modes = np.asarray(modes.cpu())
+            for i, mode in enumerate(modes):
+                # if mode == 1: 
+                #     mode = 0
+                #     modes[i] = 0
+                Yp_modes[mode].append(Yp4RE[i])
+            for mode in [0,1,2]:
+                logging.info(f'number of Y in mode {mode}: {len(Yp_modes[mode])}')
+            for mode in [0, 1, 2]:
+                if len(Yp_modes[mode]) == 0:
+                    continue
+                tmp_Yp = torch.stack(Yp_modes[mode]).to(Yp4RE.device)
+                H_est = route_estimators[mode](tmp_Yp)
+                H_est = np.asarray(H_est.cpu()) # Nsx256
+                H_modes[mode] = H_est
+            
+            for i in range(len(Yp4RE)):
+                mode = modes[i]
+                predH.append(H_modes[mode][cnt[mode]])
+                cnt[mode] += 1
+            predH = np.asarray(predH)
+        return predH
+
+    def estimateX(self, Yd, H_est):
+        # Yd: Nsx1024
+        # H_est: Nsx256
+        Yd = transfer_Y(Yd)
+        Hf_est = transfer_H(H_est)
+        _, predX = self.MLReceiver(Yd, Hf_est)
+        return predX
     
     def MLReceiver(self, Y, H, num_workers = 16):
         Codebook = self.MakeCodebook(4)
@@ -162,8 +216,8 @@ class FullRunner():
         X_bits = np.zeros((batch, 2, 2, B, T))
 
         for num in range(batch):
-            # if num % 100 == 0:
-            #     print('P{0}'.format(label),': Completed batches [%d]/[%d]'%(num ,batch), time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
+            if num % 100 == 0:
+                print('P{0}'.format(label),': Completed batches [%d]/[%d]'%(num ,batch), time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
 
             for idx in range(T):
                 y = Y[num, :, :, idx]

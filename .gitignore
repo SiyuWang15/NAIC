@@ -29,7 +29,7 @@ __pycache__/
 # Distribution / packaging
 .Python
 build/
-workspace_old/
+workspace*/
 develop-eggs/
 dist/
 downloads/

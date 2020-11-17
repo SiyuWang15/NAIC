@@ -6,7 +6,7 @@ from argparse import Namespace
 from utils import set_logger, seed_everything, get_config, arg_parser
 from multiprocessing import Pool
 
-from runners import Y2HRunner, Y2XRunner, Y2ModeRunner, FullRunner
+from runners import Y2HRunner, FullRunner
 
 def run_y2h(args):
     config = get_config('./configs/y2h_config.yml')
@@ -70,7 +70,7 @@ def run_full(args):
     if config.log.run_mode == 'validation':
         # logging.info(f'validating on Pn={args.Pn}')
         runner = FullRunner(config)
-        runner.run()
+        runner.simple_run()
     elif config.log.run_mode == 'testing':
         logging.info(f'testing on Pn={args.Pn}')
         runner = FullRunner(config)

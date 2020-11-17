@@ -8,7 +8,7 @@ import os
 import sys
 sys.path.append('..')
 from Estimators import RouteEstimator, CNNRouteEstimator, ResNetRouteEstimator
-from data import get_YH_data, get_YH_data_random
+from data import get_YH_data_random
 
 class Y2HRunner():
     def __init__(self, config, cnn:bool=False):
@@ -29,7 +29,13 @@ class Y2HRunner():
         mse = nn.MSELoss(reduction='sum')(H_pred, H_label)
         norm = torch.pow(H_label, 2).sum()
         return mse / norm
-
+    
+    # def MNSE(self, H_pred, H_label):
+    #     mse = torch.pow(H_pred - H_label, 2)
+    #     norm = torch.pow(H_label, 2)
+    #     loss = (mse / norm).sum(-1).mean()
+    #     return loss
+    
 
     def run(self):
         device = 'cuda'
@@ -49,10 +55,7 @@ class Y2HRunner():
         optimizer = self.get_optimizer(model.parameters())
         scheduler = optim.lr_scheduler.StepLR(optimizer, step_size = 30, gamma = 0.1)
         
-        if self.config.train.random:
-            train_set, val_set = get_YH_data_random(self.mode, self.Pn, self.cnn)
-        else:
-            train_set, val_set = get_YH_data(self.mode, self.Pn, self.config.model.Hdom)
+        train_set, val_set = get_YH_data_random(self.mode, self.Pn)
         logging.info('Data Loaded!')
         # outdim = 2*2*32 if self.config.model.Hdom == 'time' else 256
         # assert self.config.model.out_dim == outdim  'out dimension not consistent with H domain'
@@ -78,11 +81,13 @@ class Y2HRunner():
         for epoch in range(self.config.train.n_epochs):
             it = 0
             model.train()
-            for Yp,  H_label in train_loader: 
+            for Yp, Yd, H_label in train_loader: 
                 Yp = Yp.to(device)
+                Yd = Yd.to(device)
+                Y_input = torch.cat([Yp, Yd], dim = 1)
                 H_label = H_label.to(device)
 
-                H_pred = model(Yp)
+                H_pred = model(Y_input)
                 # loss = nn.MSELoss(reduction='mean')(H_pred, H_label)
                 nmse = self.NMSE(H_pred, H_label)
                 loss = nmse
@@ -92,17 +97,19 @@ class Y2HRunner():
                 nmse = nmse.item()
         
                 if it % self.config.log.print_freq == 0:
-                    logging.info(f'Epoch {epoch:>2d} || Iter {it} || mode {self.mode} Pn {self.Pn} || NMSE Loss: {nmse:.5f}')
+                    logging.info(f'Epoch {epoch:>2d} || Iter {it} || mode {self.mode} Pn {self.Pn} || NMSE : {nmse:.5f}')
                 it += 1
                         
             with torch.no_grad():
                 model.eval()
                 H_labels = []
                 H_preds = []
-                for Yp, H_label in val_loader:
+                for Yp, Yd, H_label in val_loader:
                     Yp = Yp.to(device)
+                    Yd = Yd.to(device)
+                    Y_input = torch.cat([Yp, Yd], dim = 1)
                     H_label = H_label.to(device)
-                    H_pred = model(Yp)
+                    H_pred = model(Y_input)
                     H_preds.append(H_pred)
                     H_labels.append(H_label)
                 H_labels = torch.cat(H_labels, 0)
