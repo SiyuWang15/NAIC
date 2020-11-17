@@ -14,9 +14,9 @@ model:
   Hdom: time
 train:
   batch_size: 512
-  lr: 0.001
+  lr: 0.003
   lr_decay: 0
   optimizer: adam
   random: 1 
   val_batch_size: 1024
-  n_epochs: 50
+  n_epochs: 1000

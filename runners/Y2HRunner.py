@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.optim as optim
 from torch.utils.data import DataLoader
 import numpy as np 
 import logging
@@ -18,9 +19,9 @@ class Y2HRunner():
     
     def get_optimizer(self, parameters):
         if self.config.train.optimizer == 'adam':
-            return torch.optim.Adam(parameters, lr = self.config.train.lr)
+            return optim.Adam(parameters, lr = self.config.train.lr)
         elif self.config.train.optimizer == 'sgd':
-            return torch.optim.SGD(parameters, lr = self.config.train.lr, momentum=0.9)
+            return optim.SGD(parameters, lr = self.config.train.lr, momentum=0.9)
         else:
             raise NotImplementedError('Optimizer {} not understood.'.format(self.config.train.optimizer))
     
@@ -32,6 +33,7 @@ class Y2HRunner():
 
     def run(self):
         device = 'cuda'
+        logging.info(f'using lr scheduler.')
         # description = r'CNN Y2HEstimator, input dim: bsx2x16x32 (via order F reshape), output dim bsx256.'
         # logging.info(description)
         if self.cnn is False:
@@ -45,6 +47,7 @@ class Y2HRunner():
             logging.info('ResNet34 model')
             model = ResNetRouteEstimator(34).to(device)
         optimizer = self.get_optimizer(model.parameters())
+        scheduler = optim.lr_scheduler.StepLR(optimizer, step_size = 30, gamma = 0.1)
         
         if self.config.train.random:
             train_set, val_set = get_YH_data_random(self.mode, self.Pn, self.cnn)
@@ -75,20 +78,21 @@ class Y2HRunner():
         for epoch in range(self.config.train.n_epochs):
             it = 0
             model.train()
-            for Yp, H_label in train_loader: # H_label: bsx256 Yp bsx1024
+            for Yp,  H_label in train_loader: 
                 Yp = Yp.to(device)
                 H_label = H_label.to(device)
 
                 H_pred = model(Yp)
-                loss = nn.MSELoss(reduction='mean')(H_pred, H_label)
-                
+                # loss = nn.MSELoss(reduction='mean')(H_pred, H_label)
+                nmse = self.NMSE(H_pred, H_label)
+                loss = nmse
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-                nmse = self.NMSE(H_pred, H_label).item()
+                nmse = nmse.item()
         
                 if it % self.config.log.print_freq == 0:
-                    logging.info(f'Epoch {epoch:>2d} || Iter {it} || mode {self.mode} Pn {self.Pn} || MSE Loss: {nmse:.5f}')
+                    logging.info(f'Epoch {epoch:>2d} || Iter {it} || mode {self.mode} Pn {self.Pn} || NMSE Loss: {nmse:.5f}')
                 it += 1
                         
             with torch.no_grad():
@@ -108,6 +112,6 @@ class Y2HRunner():
                 if nmse < best_nmse:
                     best_nmse = nmse
                     torch.save(model.state_dict(), os.path.join(self.config.log.ckpt_dir, 'best.pth'))
-                
-                logging.info(f'Validation Epoch {epoch:>2d} || mode: {self.mode}, Pn: {self.Pn}  nmse: {nmse:.5f}, best nmse: {best_nmse:.5f}')
-                    
+                current_lr = optimizer.param_groups[0]['lr']
+                logging.info(f'Validation Epoch {epoch:>2d}, lr: {current_lr} || mode: {self.mode}, Pn: {self.Pn}  nmse: {nmse:.5f}, best nmse: {best_nmse:.5f}')
+            scheduler.step()

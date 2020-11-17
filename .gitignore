@@ -29,6 +29,7 @@ __pycache__/
 # Distribution / packaging
 .Python
 build/
+workspace_old/
 develop-eggs/
 dist/
 downloads/
