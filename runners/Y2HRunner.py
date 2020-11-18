@@ -193,7 +193,7 @@ class Y2HRunner():
                 Y_input_train = np.reshape(Y_train, [batch_size, 2, 2, 2, 256], order='F')
                 Y_input_train = Y_input_train.float()
                 Yp_train = Y_input_train[:,:,0,:,:]
-                Yp4net = torch.empty_like(Yp_train).copy_(Yp_train).to(device)
+                Yp4net = torch.empty_like(Yp_train).copy_(Yp_train)
 
                 #输入网络
                 Yp_train = Yp_train.reshape(batch_size, 2*2*256) # 取出接收导频信号，实部虚部*2*256
@@ -209,10 +209,9 @@ class Y2HRunner():
                 Yd_input_train = Yd_input_train.to(device)
 
                 if self.config.use_yp:
-                    net_input = torch.cat([Yd_input_train, Yp4net, Hf_input_train], 2) # bsx2x8x256
+                    net_input = torch.cat([Yd_input_train, Yp4net.to(device), Hf_input_train], 2) # bsx2x8x256
                 else:
                     net_input = torch.cat([Yd_input_train, Hf_input_train], 2) # bsx2x6x256
-                
                 Ht_train_refine = CNN(net_input)
 
                 #第二级网络输出
@@ -225,7 +224,7 @@ class Y2HRunner():
                 Ht_train_label = H_train.float()
 
                 # 计算loss
-                loss = criterion(Ht_train_refine, Ht_train_label.cuda())
+                loss = criterion(Ht_train_refine, Ht_train_label.to(device))
                 loss.backward()
                 optimizer_CNN.step()
                 if symbol:
@@ -257,7 +256,7 @@ class Y2HRunner():
                     Y_input_test = np.reshape(Y_test, [Ns, 2, 2, 2, 256], order='F')
                     Y_input_test = Y_input_test.float()
                     Yp_test = Y_input_test[:,:,0,:,:]
-                    Yp4net = torch.empty_like(Yp_test).copy_(Yp_test).to(device)
+                    Yp4net = torch.empty_like(Yp_test).copy_(Yp_test)
 
                     #输入网络
                     Yp_test = Yp_test.reshape(Ns, 2*2*256) # 取出接收导频信号，实部虚部*2*256
@@ -272,7 +271,7 @@ class Y2HRunner():
 
                     
                     if self.config.use_yp:
-                        net_input = torch.cat([Yd_input_test, Yp4net, Hf_input_test], 2)
+                        net_input = torch.cat([Yd_input_test, Yp4net.to(device), Hf_input_test], 2)
                     else:
                         net_input = torch.cat([Yp_input_test, Hf_input_test], 2)
 
