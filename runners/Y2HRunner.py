@@ -51,6 +51,10 @@ class Y2HRunner():
         logging.info('Data Loaded!')
 
         FC = FC_ELU_Estimation(self.config.FC.in_dim, self.config.FC.h_dim, self.config.FC.out_dim, self.config.FC.n_blocks)
+        if not self.config.train.FC_resume == 'None':
+            fp = os.path.join(f'/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_{self.mode}_Pn_{self.Pn}/FC', self.config.train.FC_resume, 'checkpoints/best.pth')
+            FC.load_state_dict(torch.load(fp))
+            logging.info(f'Loading state dict of FC from {self.config.train.FC_resume}')
         FC.to(device)
 
         criterion = NMSELoss()
@@ -68,7 +72,7 @@ class Y2HRunner():
                 batch_size = len(Y_train)
                 optimizer.zero_grad()
                 # 真实的频域信道，获取标签
-                Hf_train_label = process_H(H_train.copy())
+                Hf_train_label = process_H(H_train)
                 # 第一层网络输入
                 Y_input_train = np.reshape(Y_train, [batch_size, 2, 2, 2, 256], order='F')
                 Y_input_train = Y_input_train.float()
@@ -89,7 +93,7 @@ class Y2HRunner():
                 for Y_test, X_test, H_test in val_loader:
                     Ns = Y_test.shape[0]
                     # 真实的频域信道，获取标签
-                    Hf_test_label = process_H(H_test.copy())
+                    Hf_test_label = process_H(H_test)
 
                     # 第一层网络输入
                     Y_input_test = np.reshape(Y_test, [Ns, 2, 2, 2, 256], order='F')
@@ -137,7 +141,7 @@ class Y2HRunner():
         FC.to(device)
         if self.config.train.FC_resume is not 'None':
             fp = os.path.join(f'/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_{self.mode}_Pn_{self.Pn}/FC', self.config.train.FC_resume, 'checkpoints/best.pth')
-            FC.load_state_dict(torch.load(fp))
+            FC.load_state_dict(torch.load(fp)['fc'])
             logging.info(f'Loading state dict of FC from {self.config.train.FC_resume}')
         if self.config.train.freeze_FC:
             for param in FC.parameters():

@@ -9,7 +9,7 @@ from multiprocessing import Pool
 from runners import Y2HRunner, FullRunner
 
 def run_y2h(args):
-    config = get_config('./configs/y2h_config.yml')
+    config = get_config(f'./configs/y2h_config_{args.run_mode}.yml')
     if config.model == 'fc':
         config.log_prefix = f'workspace/ResnetY2HEstimator/mode_{config.mode}_Pn_{config.Pn}/FC'
     elif config.model == 'cnn':
@@ -21,6 +21,7 @@ def run_y2h(args):
     logging.info(config)
     runner = Y2HRunner(config)
     runner.run()
+
 
 def run_full(args):
     config = get_config('./configs/full_config.yml')

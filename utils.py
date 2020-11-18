@@ -45,6 +45,7 @@ def arg_parser():
     parser.add_argument('--Pn', default = 32, type=int)
     parser.add_argument('--time', default = 'default', type=str)
     parser.add_argument('--runner', default = 'y2h', type = str)
+    parser.add_argument('--run_mode', default = 'none', type = str)
     return parser
 
 def get_config(fp):

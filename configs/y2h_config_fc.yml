@@ -1,19 +1,15 @@
 mode: 0
-Pn: 8
-model: cnn
-cnnmodel: base
+Pn: 32
+model: fc
 n_epochs: 300
 print_freq: 100
 lr_decay: 30
 lr_threshold: 0.00001
 train:
-  cnn_lr: 0.0003
-  fc_lr: 0.0001
+  fc_lr: 0.0003
   train_batch_size: 512 # 256 for resnet34, 512 for base
   val_batch_size: 2000
-  FC_resume: 1118-00-36-40
-  CNN_resume: None
-  freeze_FC: False
+  FC_resume: None
   optimizer: adam
 FC:
   in_dim: 1024
