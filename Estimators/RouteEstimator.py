@@ -100,7 +100,6 @@ class CNN_Estimation(nn.Module):
         out = self.layer3(out)
         # print(out.shape)
         out = self.layer4(out)
-        # print(out.shape)
         # out = F.avg_pool2d(out, 4)
         out = out.view(out.size(0), -1)
         out = self.linear(out)

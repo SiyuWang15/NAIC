@@ -141,7 +141,10 @@ class Y2HRunner():
         FC.to(device)
         if self.config.train.FC_resume is not 'None':
             fp = os.path.join(f'/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_{self.mode}_Pn_{self.Pn}/FC', self.config.train.FC_resume, 'checkpoints/best.pth')
-            FC.load_state_dict(torch.load(fp)['fc'])
+            try:
+                FC.load_state_dict(torch.load(fp)['fc'])
+            except:
+                FC.load_state_dict(torch.load(fp))
             logging.info(f'Loading state dict of FC from {self.config.train.FC_resume}')
         if self.config.train.freeze_FC:
             for param in FC.parameters():
@@ -156,7 +159,10 @@ class Y2HRunner():
         elif self.config.cnnmodel == 'resnet50':
             CNN = ResNet50().to(device)
         if not self.config.train.CNN_resume == 'None':
-            CNN.load_state_dict(torch.load(self.config.train.CNN_resume))
+            fp = os.path.join(f'/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_{self.mode}_Pn_{self.Pn}/CNN', self.config.train.CNN_resume, 'checkpoints/best.pth')
+            FC.load_state_dict(torch.load(fp)['fc'])
+            CNN.load_state_dict(torch.load(fp)['cnn'])
+            logging.info(f'load state dicts of CNN and FC from {fp}')
         
         best_nmse = 1000.
         criterion = NMSELoss()
@@ -187,6 +193,7 @@ class Y2HRunner():
                 Y_input_train = np.reshape(Y_train, [batch_size, 2, 2, 2, 256], order='F')
                 Y_input_train = Y_input_train.float()
                 Yp_train = Y_input_train[:,:,0,:,:]
+                Yp4net = torch.empty_like(Yp_train).copy_(Yp_train).to(device)
 
                 #输入网络
                 Yp_train = Yp_train.reshape(batch_size, 2*2*256) # 取出接收导频信号，实部虚部*2*256
@@ -199,9 +206,12 @@ class Y2HRunner():
                 
                 Hf_input_train = Hf_train_output
                 Yd_input_train = Y_input_train[:,:,1,:,:] 
-                Yd_input_train = Yd_input_train.cuda()
+                Yd_input_train = Yd_input_train.to(device)
 
-                net_input = torch.cat([Yd_input_train, Hf_input_train], 2) # bsx2x6x256
+                if self.config.use_yp:
+                    net_input = torch.cat([Yd_input_train, Yp4net, Hf_input_train], 2) # bsx2x8x256
+                else:
+                    net_input = torch.cat([Yd_input_train, Hf_input_train], 2) # bsx2x6x256
                 
                 Ht_train_refine = CNN(net_input)
 
@@ -247,6 +257,7 @@ class Y2HRunner():
                     Y_input_test = np.reshape(Y_test, [Ns, 2, 2, 2, 256], order='F')
                     Y_input_test = Y_input_test.float()
                     Yp_test = Y_input_test[:,:,0,:,:]
+                    Yp4net = torch.empty_like(Yp_test).copy_(Yp_test).to(device)
 
                     #输入网络
                     Yp_test = Yp_test.reshape(Ns, 2*2*256) # 取出接收导频信号，实部虚部*2*256
@@ -256,12 +267,15 @@ class Y2HRunner():
                     Hf_test_output = Hf_test_output.reshape(Ns, 2, 4, 256)
                     
                     Hf_input_test = Hf_test_output
-                    Yp_input_test = Y_input_test[:,:,1,:,:] 
-                    Yp_input_test = Yp_input_test.cuda()
+                    Yd_input_test = Y_input_test[:,:,1,:,:] 
+                    Yd_input_test = Yd_input_test.to(device)
 
-                    net_input = torch.cat([Yp_input_test, Hf_input_test], 2)
-                    # net_input = torch.reshape(net_input, [Ns, 1, 12, 256])
                     
+                    if self.config.use_yp:
+                        net_input = torch.cat([Yd_input_test, Yp4net, Hf_input_test], 2)
+                    else:
+                        net_input = torch.cat([Yp_input_test, Hf_input_test], 2)
+
                     Ht_test_refine = CNN(net_input)
 
                     #第二级网络输出
