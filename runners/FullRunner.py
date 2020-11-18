@@ -103,11 +103,13 @@ class FullRunner():
             Yd = Yd[:, 0, :, :] + 1j * Yd[:, 1, :, :]
             _, predX = MLReceiver(Yd, Hf_pred)
             predXs.append(predX)
+            logging.info(f'[{(i+1)*bs}]/[{len(Y)}] complete!')
         predXs = np.concatenate(predXs, axis = 0)
         predXs = np.array(np.floor(predXs+0.5), dtype = np.bool)
         tag = 1 if self.Pn == 32 else 2
         dp = os.path.join(self.config.log_dir, f'X_pre_{tag}.bin')
         predXs.tofile(dp)
+        logging.info(f'Complete! Results saved at {dp}')
 
     def NMSE(self, H_pred, H_label):
         mse = np.power(H_pred-H_label, 2).sum()
