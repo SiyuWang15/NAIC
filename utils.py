@@ -10,7 +10,7 @@ import argparse
 
 # logging
 def set_logger(config):
-    log = os.path.join(config.log.log_dir, 'training.log')
+    log = os.path.join(config.log_dir, 'training.log')
     level = getattr(logging, 'INFO', None)
     if not isinstance(level, int):
         raise ValueError('level {} not supported'.format(args.verbose))
@@ -43,14 +43,15 @@ def arg_parser():
     parser.add_argument('--slice', default=0, type = int, help='use which slice of X as label')
     parser.add_argument('--mode', default = 0, type=int)
     parser.add_argument('--Pn', default = 32, type=int)
-    parser.add_argument('--log_prefix', default = 'default', type=str)
+    parser.add_argument('--time', default = 'default', type=str)
     parser.add_argument('--runner', default = 'y2h', type = str)
     return parser
 
 def get_config(fp):
     config = yaml.safe_load(open(fp))
     for k, v in config.items():
-        config[k] = argparse.Namespace(**v)
+        if type(v) is dict:
+            config[k] = argparse.Namespace(**v)
     config = argparse.Namespace(**config)
     return config
 
@@ -59,34 +60,6 @@ def to_numpy(x):
         return np.array(x)
     else:
         return x
-
-def flattern_Y(Y): # Nsx2x2x2x256 or Nsx2x2x256
-    # for 2x2x2x256, imag or real, Yp and Yd, 2, 256
-    # for 2x2x256 (only Yp or Yd), imag or real, 2, 256
-    YY = to_numpy(Y)
-    YY = np.reshape(YY, [len(YY), -1], order = 'F')
-    assert YY.shape[-1] == 2048 or YY.shape[-1] == 1024
-    return YY
-
-def transfer_Y(Y): # Nsx2048 or Nsx1024  
-    # return YY: Nsx2x256 complex number can be fed into MLReceiver
-    # return YY: Nsx2x2x256 complex number should extract data first and then feed into Receiver
-    YY = to_numpy(Y)
-    assert YY.shape[-1] == 2048 or YY.shape[-1] == 1024
-    if YY.shape[-1] == 2048:
-        YY = np.reshape(YY, [-1, 2, 2, 2, 256], order = 'F') 
-        # print('Yp and Yd are all here.')
-        return real2complex(YY, 'Y')
-    if YY.shape[-1] == 1024:
-        YY = np.reshape(YY, [-1, 2, 2, 256], order = 'F')
-        # print('only Yp or Yd')
-        return real2complex(YY, 'Yd')
-
-def flattern_H(H):  # only for time domain
-    # H: Nsx2x4x32 imag or real, 4 routes, 32 dimension in time domain
-    # This is only for siyu's Hdata since siyu didn't reshape H via order 'F'
-    HH = to_numpy(H)
-    return np.reshape(HH, [len(HH), -1])
 
 
 def transfer_H(H):
@@ -108,3 +81,17 @@ def real2complex(D, tag):
         return D[:, 0, :, :] + 1j * D[:, 1, :, :]
     if tag == 'Y':
         return D[:, 0, :, :, :] + 1j * D[:, 1, :, :, :]
+    
+
+def process_H(H): # bs x 2 x 4 x 32
+    # 真实的频域信道，获取标签
+    batch_size = len(H)
+    Hf_train = np.array(H)[:, 0, :] + 1j * np.array(H)[:, 1, :]
+    Hf_train = np.fft.fft(Hf_train, 256)/20 # 4*256
+    Hf_train_label = torch.zeros([batch_size, 2, 4, 256], dtype=torch.float32)
+    Hf_train_label[:, 0, :, :] = torch.tensor(Hf_train.real, dtype = torch.float32)
+    Hf_train_label[:, 1, :, :] = torch.tensor(Hf_train.imag, dtype = torch.float32)
+    return Hf_train_label
+
+def process_Y(Y): # bsx2x2x256
+    return real2complex(Y, 'Yd')

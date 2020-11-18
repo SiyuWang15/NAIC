@@ -1,19 +1,11 @@
 # config for full runner
-ME:
-  out_dim: 2
-RE: # Route Estimator
-  model: CNN # CNN or MLP
-  # for CNN model
-  in_nc: 2
-  numblocks: [2,2,2,2]
-  h_dims: [512, 512, 256]
+cnnmodel: base # base or resnet34 or resnet50
+Pn: 8
+mode: 0
+FC:
   in_dim: 1024
-  out_dim: 256
-  act: sigmoid
-  Hdom: time
-  Pilotnum: 8
-ckpt:
-  models: [cnn, resnet, cnn]
-  redir: [1112-12-59-18, 1113-16-57-39, 1114-23-39-47] # path to checkpoint files of route estimators 
-log:
-  run_mode: validation  # validation or testing
+  h_dim: 4096
+  out_dim: 2048
+  n_blocks: 2
+resume: 1118-01-07-26
+run_mode: validation  # validation or testing

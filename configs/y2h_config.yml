@@ -1,22 +1,22 @@
-OFDM:
-  Pilotnum: 32
-  SNRdb: -1  # -1 mean random SNR
-  mode: 0
-log:
-  print_freq: 100
-  val_freq: 1
-  save_freq: 1
-model:
-  h_dims: [512, 512, 256]
-  in_dim: 1024
-  out_dim: 256
-  act: sigmoid
-  Hdom: time
+mode: 0
+Pn: 8
+model: cnn
+cnnmodel: base
+n_epochs: 300
+print_freq: 100
+lr_decay: 30
+lr_threshold: 0.00001
 train:
-  batch_size: 1024
-  lr: 0.002
-  lr_decay: 0
+  cnn_lr: 0.0003
+  fc_lr: 0.0001
+  train_batch_size: 512 # 256 for resnet34, 512 for base
+  val_batch_size: 2000
+  FC_resume: 1118-00-36-40
+  CNN_resume: None
+  freeze_FC: False
   optimizer: adam
-  random: 1 
-  val_batch_size: 1024
-  n_epochs: 20
+FC:
+  in_dim: 1024
+  h_dim: 4096
+  out_dim: 2048
+  n_blocks: 2
