@@ -14,6 +14,7 @@ def run_y2h(args):
         config.log_prefix = f'workspace/ResnetY2HEstimator/mode_{config.mode}_Pn_{config.Pn}/FC'
     elif config.model == 'cnn':
         config.log_prefix = f'workspace/ResnetY2HEstimator/mode_{config.mode}_Pn_{config.Pn}/CNN'
+    config.Pn = args.Pn
     config.log_dir = os.path.join(config.log_prefix, args.time)
     config.ckpt_dir = os.path.join(config.log_dir, 'checkpoints')
     os.makedirs(config.ckpt_dir)

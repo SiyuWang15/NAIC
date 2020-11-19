@@ -17,6 +17,10 @@ class RandomDataset():
         self.mode = mode
 
     def __getitem__(self, index):
+        # return 
+        # Yp: 1024 can be directedly fed into FC 
+        # Yp4cnn: 2x2x256 used for cnn net, can be directedly cat with hf and Yd
+        # Yd: 2x2x256  used for cnn net, can be directedly cat with hf and Yp4cnn
         HH = self.H[index]
         seed = math.floor(math.modf(time.time())[0]*500*320000)**2 % (2**32 - 2)
         np.random.seed(seed)
@@ -31,9 +35,14 @@ class RandomDataset():
         if self.mode == -1:
             mm = np.random.randint(0, 3)
         YY = MIMO([bits0, bits1], HH, SS, mm, self.Pilot_num)/20
+        YY = np.reshape(Y_train, [2, 2, 2, 256], order = 'F')
+        Yp = YY[:, 0, :, :]
+        Yd = YY[:, 1, :, :]
+        Yp4cnn = Yp.copy()
+        Yp4fc = Yp.reshape(-1)
         XX = np.concatenate([bits0, bits1], 0)
         newHH = np.stack([HH.real, HH.imag], axis = 0)
-        return YY, XX, newHH
+        return Yp4fc, Yp4cnn, Yd, XX, newHH 
 
     def __len__(self):
         return len(self.H)

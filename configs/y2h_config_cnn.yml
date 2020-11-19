@@ -11,9 +11,9 @@ train:
   cnn_lr: 0.0003
   fc_lr: 0.0001
   train_batch_size: 256 # 256 for resnet34, 512 for base
-  val_batch_size: 2000
-  FC_resume: 1118-00-36-40 # 1118-15-33-37 for Pn 32 1118-00-36-40 for Pn 8
-  CNN_resume: None # 1118-01-07-26
+  val_batch_size: 1000
+  FC_resume: None # 1118-15-33-37 for Pn 32 1118-00-36-40 for Pn 8
+  CNN_resume: 1118-16-48-49 # 1118-01-07-26
   freeze_FC: True
   optimizer: adam
 FC:
