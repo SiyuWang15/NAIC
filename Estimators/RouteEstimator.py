@@ -66,7 +66,7 @@ class Bottleneck(nn.Module):
         return out
 
 class CNN_Estimation(nn.Module):
-    def __init__(self, block=BasicBlock, num_blocks=[2,2,2,2], num_classes=256):
+    def __init__(self, block=BasicBlock, num_blocks=[2,2,2,2], num_classes=64):
         super(CNN_Estimation, self).__init__()
         self.in_planes = 64
 

@@ -253,7 +253,6 @@ class EMAY2HRunner():
                 Ht = torch.cat(Ht_list, dim = 0)
                 Hlabel = torch.cat(Hlabel_list, dim = 0)
                 loss = criterion(Ht, Hlabel)
-                logging.info(f'Epoch [{epoch}]/[{self.config.n_epochs}] || NMSE {loss.item():.5f}, best nmse: {best_nmse:.5f}')
                 
                 if loss < best_nmse:
                     state_dicts = {
@@ -263,6 +262,7 @@ class EMAY2HRunner():
                     }
                     best_nmse = loss.item()
                     torch.save(state_dicts, os.path.join(self.config.ckpt_dir, 'best_ema.pth'))
+                logging.info(f'Epoch [{epoch}]/[{self.config.n_epochs}] || NMSE {loss.item():.5f}, best nmse: {best_nmse:.5f}')
 
                 if epoch % self.config.save_freq == 0:
                     fp = os.path.join(self.config.ckpt_dir, f'epoch{epoch}_ema.pth')

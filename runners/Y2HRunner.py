@@ -172,7 +172,8 @@ class Y2HRunner():
                     cnn_input = torch.cat([Yd.to(device), Yp4cnn.to(device), Hf], dim = 2)
                 else:
                     cnn_input = torch.cat([Yd.to(device), Hf], dim = 2)
-                Ht = CNN(cnn_input).reshape(bs, 2, 4, 32)
+                # Ht = CNN(cnn_input).reshape(bs, 2, 4, 32)
+                Ht = CNN(cnn_input).reshape(bs, 2, 32)
                 H_label = H_label.to(device)
 
                 loss = criterion(Ht, H_label)
@@ -211,20 +212,27 @@ class Y2HRunner():
                         cnn_input = torch.cat([Yd.to(device), Yp4cnn.to(device), Hf], dim = 2)
                     else:
                         cnn_input = torch.cat([Yd.to(device), Hf], dim = 2)
-                    Ht = CNN(cnn_input).reshape(bs, 2, 4, 32).cpu()
+                    # Ht = CNN(cnn_input).reshape(bs, 2, 4, 32).cpu()
+                    Ht = CNN(cnn_input).reshape(bs, 2, 32).cpu()
                     Ht_list.append(Ht)
                     Hlabel_list.append(H_label.float())
                 Ht = torch.cat(Ht_list, dim = 0)
                 Hlabel = torch.cat(Hlabel_list, dim = 0)
                 loss = criterion(Ht, Hlabel)
-                fp = os.path.join(self.config.ckpt_dir, f'epoch{epoch}.pth')
-                state_dicts = {
-                    'cnn': CNN.state_dict(),
-                    'fc': FC.state_dict()
-                }
-                torch.save(state_dicts, fp)
                 if loss < best_nmse:
-                    torch.save(state_dicts, os.path.join(self.config.ckpt_dir, 'best.pth'))
-                    best_nmse = loss
-                logging.info(f'{fp} saved.')
+                    best_nmse = loss.item()
+                    state_dicts = {
+                        'cnn': CNN.state_dict(),
+                        'fc': FC.state_dict(),
+                        'epoch_num': epoch
+                    }
+                    torch.save(state_dicts, os.path.join(self.config.ckpt_dir, f'best.pth'))
+                if epoch % self.config.save_freq == 0:
+                    fp = os.path.join(self.config.ckpt_dir, f'epoch{epoch}.pth')
+                    state_dicts = {
+                        'cnn': CNN.state_dict(),
+                        'fc': FC.state_dict()
+                    }
+                    torch.save(state_dicts, fp)
+                    logging.info(f'{fp} saved.')
                 logging.info(f'Epoch [{epoch}]/[{self.config.n_epochs}] || NMSE {loss.item():.5f}, best nmse: {best_nmse:.5f}')
