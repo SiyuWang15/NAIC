@@ -35,13 +35,13 @@ class RandomDataset():
         if self.mode == -1:
             mm = np.random.randint(0, 3)
         YY = MIMO([bits0, bits1], HH, SS, mm, self.Pilot_num)/20
-        YY = np.reshape(Y_train, [2, 2, 2, 256], order = 'F')
+        YY = np.reshape(YY, [2, 2, 2, 256], order = 'F').astype('float32')
         Yp = YY[:, 0, :, :]
         Yd = YY[:, 1, :, :]
         Yp4cnn = Yp.copy()
         Yp4fc = Yp.reshape(-1)
-        XX = np.concatenate([bits0, bits1], 0)
-        newHH = np.stack([HH.real, HH.imag], axis = 0)
+        XX = np.concatenate([bits0, bits1], 0).astype('float32')
+        newHH = np.stack([HH.real, HH.imag], axis = 0).astype('float32')
         return Yp4fc, Yp4cnn, Yd, XX, newHH 
 
     def __len__(self):

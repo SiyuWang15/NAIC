@@ -42,9 +42,9 @@ def arg_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument('--slice', default=0, type = int, help='use which slice of X as label')
     parser.add_argument('--mode', default = 0, type=int)
-    parser.add_argument('--Pn', default = 32, type=int)
+    parser.add_argument('--Pn', default = -1, type=int)
     parser.add_argument('--time', default = 'default', type=str)
-    parser.add_argument('--runner', default = 'y2h', type = str)
+    parser.add_argument('--runner', default = 'none', type = str)
     parser.add_argument('--run_mode', default = 'none', type = str)
     return parser
 

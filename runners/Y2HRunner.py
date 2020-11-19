@@ -162,7 +162,7 @@ class Y2HRunner():
                 FC.train()
 
             for it, (Yp4fc, Yp4cnn, Yd, X, H_label) in enumerate(train_loader): # H_train: bsx2(real and imag)x4x32
-                bs = Yp.shape[0]
+                bs = Yp4fc.shape[0]
                 optimizer_CNN.zero_grad()
                 Yp4fc = Yp4fc.to(device)
                 Hf = FC(Yp4fc)
@@ -213,7 +213,7 @@ class Y2HRunner():
                         cnn_input = torch.cat([Yd.to(device), Hf], dim = 2)
                     Ht = CNN(cnn_input).reshape(bs, 2, 4, 32).cpu()
                     Ht_list.append(Ht)
-                    H_label.append(H_label.float())
+                    Hlabel_list.append(H_label.float())
                 Ht = torch.cat(Ht_list, dim = 0)
                 Hlabel = torch.cat(Hlabel_list, dim = 0)
                 loss = criterion(Ht, Hlabel)
