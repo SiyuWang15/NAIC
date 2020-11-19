@@ -22,6 +22,17 @@ def run_y2h(args):
     runner = Y2HRunner(config)
     runner.run()
 
+def run_ema(args):
+    config = get_config(f'./configs/y2h_config_ema.yml')
+    assert config.model == 'cnn'
+    config.log_prefix = f'workspace/ResnetY2HEstimator/mode_{config.mode}_Pn_{config.Pn}/CNN'
+    config.log_dir = os.path.join(config.log_prefix, args.time)
+    config.ckpt_dir = os.path.join(config.log_dir, 'checkpoints')
+    os.makedirs(config.ckpt_dir)
+    set_logger(config)
+    logging.info(config)
+    runner = Y2HRunner(config)
+    runner.run()
 
 def run_full(args):
     config = get_config('./configs/full_config.yml')

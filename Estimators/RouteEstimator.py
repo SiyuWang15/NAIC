@@ -1,8 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from .base import ResizeConv2d, BasicBlockEnc, BasicBlockDec
-from .resnet import *
+# from .resnet import *
 
 
 class BasicBlock(nn.Module):
