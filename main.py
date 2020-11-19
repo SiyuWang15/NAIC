@@ -26,6 +26,7 @@ def run_y2h(args):
 def run_full(args):
     config = get_config('./configs/full_config.yml')
     config.run_mode = args.runner
+    config.Pn = args.Pn
     config.log_dir = os.path.join('workspace', config.run_mode, f'mode_{config.mode}_Pn_{config.Pn}', args.time)
     os.makedirs(config.log_dir)
     set_logger(config)

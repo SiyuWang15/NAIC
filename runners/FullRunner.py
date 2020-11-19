@@ -53,18 +53,23 @@ class FullRunner():
         CNN.eval()
         Y, X, H = get_val_data(self.Pn, self.mode)
         logging.info('Data Loaded.')
-        bs = 500
+        bs = 200
         predXs = []
         predHts = []
         for i in range(int(len(Y) / bs)):
             YY = Y[i*bs:(i+1)*bs, :]
             YY = np.reshape(YY, [bs, 2, 2, 2, 256], order = 'F').astype('float32')
-            Yp = YY[:, :, 0, :, :].reshape(bs, 2*2*256)
+            Yp = YY[:, :, 0, :, :]
+            Yp4cnn = Yp.copy()
+            Yp = Yp.reshape(bs, 2*2*256)
             Yd = YY[:, :, 1, :, :]
             Hf = FC(torch.Tensor(Yp).to(device))
             Hf = Hf.reshape(bs, 2, 4, 256)
-            YdHfcat = torch.cat([torch.Tensor(Yd).to(device), Hf], dim=2)
-            Ht = CNN(YdHfcat)
+            if not self.config.use_yp:
+                cnn_input = torch.cat([torch.Tensor(Yd).to(device), Hf], dim=2)
+            else:
+                cnn_input = torch.cat([torch.Tensor(Yd).to(device),torch.Tensor(Yp4cnn).to(device), Hf], dim = 2)
+            Ht = CNN(cnn_input)
             Ht = Ht.reshape(bs, 2, 4, 32).detach().cpu().numpy()
             predHts.append(Ht)
             Ht = Ht[:, 0, :, :] + 1j*Ht[:, 1, :, :]
@@ -73,10 +78,10 @@ class FullRunner():
             Yd = Yd[:, 0, :, :] + 1j * Yd[:, 1, :, :]
             _, predX = MLReceiver(Yd, Hf_pred)
             predXs.append(predX)
+            logging.info(f'[{(i+1)*bs}]/[{len(Y)}] complete!')
         predXs = np.concatenate(predXs, axis = 0)
         predHts = np.concatenate(predHts, axis = 0)
         acc = (predXs == X).astype('float32').mean()
-        print(H.shape, predHts.shape)
         nmse = self.NMSE(predHts, H)
         logging.info(f'validation on {self.config.resume}, acc: {acc:.5f}, nmse: {nmse:.5f}')
 
@@ -86,16 +91,21 @@ class FullRunner():
         FC.eval()
         CNN.eval()
         Y = get_test_data(self.Pn) # 10000x2x2x256
-        bs = 500
+        bs = 200
         predXs = []
         for i in range(int(len(Y) / bs)):
             YY = Y[i*bs:(i+1)*bs, :]
-            Yp = YY[:, :, 0, :, :].reshape(bs, 2*2*256)
+            Yp = YY[:, :, 0, :, :]
+            Yp4cnn = Yp.copy()
+            Yp = Yp.reshape(bs, 2*2*256)
             Yd = YY[:, :, 1, :, :]
             Hf = FC(torch.Tensor(Yp).to(device))
             Hf = Hf.reshape(bs, 2, 4, 256)
-            YdHfcat = torch.cat([torch.Tensor(Yd).to(device), Hf], dim=2)
-            Ht = CNN(YdHfcat)
+            if self.config.use_yp :
+                net_input = torch.cat([torch.Tensor(Yd).to(device), torch.Tensor(Yp4cnn).to(device), Hf], dim =2)
+            else:
+                net_input = torch.cat([torch.Tensor(Yd).to(device), Hf], dim=2)
+            Ht = CNN(net_input)
             Ht = Ht.reshape(bs, 2, 4, 32).detach().cpu().numpy()
             Ht = Ht[:, 0, :, :] + 1j*Ht[:, 1, :, :]
             Hf_pred = np.fft.fft(Ht, 256) / 20.

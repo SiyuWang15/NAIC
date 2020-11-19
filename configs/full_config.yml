@@ -1,11 +1,12 @@
 # config for full runner
 cnnmodel: base # base or resnet34 or resnet50
-Pn: 8
+Pn: 32
 mode: 0
+use_yp: True
 FC:
   in_dim: 1024
   h_dim: 4096
   out_dim: 2048
   n_blocks: 2
-resume: 1118-01-07-26
+resume: 1118-16-48-49
 run_mode: validation  # validation or testing

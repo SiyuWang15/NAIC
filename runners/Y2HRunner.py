@@ -69,6 +69,7 @@ class Y2HRunner():
 
             FC.train()
             for it, (Y_train, X_train, H_train) in enumerate(train_loader):
+                
                 batch_size = len(Y_train)
                 optimizer.zero_grad()
                 # 真实的频域信道，获取标签
