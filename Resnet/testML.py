@@ -55,7 +55,7 @@ codebook = MakeCodebook(G)
 #### 基于ML恢复发送比特流X ####
 
 
-X_ML2, X_bits2 = MLReceiver(Yp,Hf,codebook)
+X_ML2, X_bits2 = MLReceiver(Yd,Hf,codebook)
 K = 256
 P = Pilot_num * 2
 pilotCarriers = np.arange(0, K, K // P)

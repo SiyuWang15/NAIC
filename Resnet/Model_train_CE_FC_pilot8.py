@@ -158,6 +158,7 @@ for epoch in range(epochs):
 
             Yp_test = Y_input_test[:,:,0,:,:] # 取出接收导频信号，实部虚部*2*256
             Yp_test = Yp_test.reshape(Ns, 2*2*256) # 取出接收导频信号，实部虚部*2*256
+            
             Yp_test = Yp_test.cuda()
             Hf_test_output = FC(Yp_test)
             # 第一级网络输出

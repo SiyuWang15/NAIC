@@ -249,86 +249,6 @@ def ResNet101():
 def ResNet152():
     return ResNet(Bottleneck, [3,8,36,3])
 
-class CNN_Estimation(nn.Module):
-    def __init__(self, block=BasicBlock, num_blocks=[2,2,2,2], num_classes=256):
-        super(CNN_Estimation, self).__init__()
-        self.in_planes = 64
-
-        self.conv1 = nn.Conv2d(2, 64, kernel_size=3,
-                       stride=1, padding=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(64)
-        
-        self.layer1 = self._make_layer(block, 64, num_blocks[0], stride=1)
-        self.layer2 = self._make_layer(block, 128, num_blocks[1], stride=2)
-        self.layer3 = self._make_layer(block, 256, num_blocks[2], stride=2)
-        self.layer4 = self._make_layer(block, 512, num_blocks[3], stride=2)
-        # self.linear = nn.Linear(512*4*6, num_classes)
-        self.linear = nn.Linear(512*1*32, num_classes)
-
-    def _make_layer(self, block, planes, num_blocks, stride):
-        strides = [stride] + [1]*(num_blocks-1)
-        layers = []
-        for stride in strides:
-            layers.append(block(self.in_planes, planes, stride))
-            self.in_planes = planes * block.expansion
-        return nn.Sequential(*layers)
-
-    def forward(self, x):
-        out = F.relu(self.bn1(self.conv1(x)))
-        # print(out.shape)
-        out = self.layer1(out)
-        # print(out.shape)
-        out = self.layer2(out)
-        # print(out.shape)
-        out = self.layer3(out)
-        # print(out.shape)
-        out = self.layer4(out)
-        # print(out.shape)
-        # out = F.avg_pool2d(out, 4)
-        out = out.view(out.size(0), -1)
-        out = self.linear(out)
-        return out
-
-def CE_ResNet18():
-    return CNN_Estimation(BasicBlock, [2,2,2,2])
-
-def CE_ResNet34():
-    return CNN_Estimation(BasicBlock, [3,4,6,3])
-
-def CE_ResNet50():
-    return CNN_Estimation(Bottleneck, [3,4,6,3])
-
-def CE_ResNet101():
-    return CNN_Estimation(Bottleneck, [3,4,23,3])
-
-def CE_ResNet152():
-    return CNN_Estimation(Bottleneck, [3,8,36,3])
-
-
-class FC_ELU_Estimation(nn.Module):
-    def __init__(self, in_dim, h_dim, out_dim,n_blocks):
-        super(FC_ELU_Estimation, self).__init__()
-        self.in_dim = in_dim
-        self.out_dim = out_dim
-        self.input_layer = nn.Sequential(
-            nn.Linear(in_dim, h_dim),
-            nn.ELU(inplace=True),
-            nn.BatchNorm1d(h_dim)
-            #nn.Dropout(p=0.5)
-        )
-        hidden_layers = []
-        for i in range(n_blocks):
-            hidden_layers.extend([nn.Linear(h_dim, h_dim), nn.ELU(inplace=True), nn.BatchNorm1d(h_dim)]) # nn.Dropout(p=0.5)
-        self.hidden_layers = nn.ModuleList(hidden_layers)
-        self.output_layer = nn.Linear(h_dim, out_dim)
-
-
-    def forward(self, x):
-        x = self.input_layer(x)
-        for layer in self.hidden_layers:
-            x = layer(x)
-        x = self.output_layer(x)
-        return x
 
         
 
@@ -393,10 +313,8 @@ class DatasetFolder(Dataset):
 
 if __name__ == '__main__':
 
-    a1 = torch.randn(16, 2, 2, 256).cuda()
-    a2 = torch.randn(16, 2, 4, 256).cuda()
-    input = torch.cat([a1, a2], 2)
-    model = CNN_Estimation().cuda()
+    input = torch.randn(16, 1, 16, 256).cuda()
+    model = ResNet().cuda()
     # model = U_Net().cuda()
 
     output = model(input)
