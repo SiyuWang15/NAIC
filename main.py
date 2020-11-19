@@ -6,7 +6,7 @@ from argparse import Namespace
 from utils import set_logger, seed_everything, get_config, arg_parser
 from multiprocessing import Pool
 
-from runners import Y2HRunner, FullRunner
+from runners import Y2HRunner, FullRunner,  EMAY2HRunner
 
 def run_y2h(args):
     config = get_config(f'./configs/y2h_config_{args.run_mode}.yml')
@@ -31,7 +31,7 @@ def run_ema(args):
     os.makedirs(config.ckpt_dir)
     set_logger(config)
     logging.info(config)
-    runner = Y2HRunner(config)
+    runner = EMAY2HRunner(config)
     runner.run()
 
 def run_full(args):
@@ -54,3 +54,5 @@ if __name__ == "__main__":
         run_full(args)
     elif args.runner == 'testing':
         run_full(args)
+    elif args.runner == 'ema':
+        run_ema(args)

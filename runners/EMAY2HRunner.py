@@ -1,7 +1,15 @@
-from Estimators import *
 import torch
 import torch.nn as nn
-import numpy as np
+import torch.optim as optim
+from torch.utils.data import DataLoader
+import numpy as np 
+import logging
+import os
+import sys
+sys.path.append('..')
+from Estimators import *
+from data import get_YH_data_random
+from utils import *
 
 class EMAY2HRunner():
     def __init__(self, config, cnn:bool=False):
@@ -11,8 +19,9 @@ class EMAY2HRunner():
         self.ema_decay = self.config.ema_decay
         self.shadow = {}
         self.backup = {}
-        if self.config.model == 'cnn':
-            self.FC, self.CNN = self.get_model()
+        logging.info(f'This is an EMA runner with decay parameter {self.ema_decay}')
+        self.FC, self.CNN = self.get_model()
+        self.register()
     
     def get_model(self):
         device = 'cuda'
@@ -38,7 +47,7 @@ class EMAY2HRunner():
                 FC.load_state_dict(torch.load(fp)['fc'])
             except:
                 FC.load_state_dict(torch.load(fp))
-            logging.info(f'Loading state dict of FC from {self.config.train.FC_resume}, randomly initialize CNN')\
+            logging.info(f'Loading state dict of FC from {self.config.train.FC_resume}, randomly initialize CNN')
         return FC, CNN
 
     def register(self):
@@ -209,6 +218,7 @@ class EMAY2HRunner():
                 if it % self.config.print_freq == 0:
                     # print(nmse)
                     logging.info(f'CNN Mode:{self.mode} || Epoch: [{epoch}/{self.config.n_epochs}][{it}/{len(train_loader)}]\t Loss {loss.item():.5f}')
+                    
 
             if epoch >0:
                 if epoch % self.config.lr_decay ==0:
@@ -230,14 +240,14 @@ class EMAY2HRunner():
                 for Yp4fc, Yp4cnn, Yd, X, H_label in val_loader:
                     bs = Yp4fc.shape[0]
                     Yp4fc = Yp4fc.to(device)
-                    Hf = FC(Yp4fc)
+                    Hf = self.FC(Yp4fc)
                     Yp4fc = Yp4fc.cpu() # release gpu memory
                     Hf = Hf.reshape(bs, 2, 4, 256)
                     if self.config.use_yp:
                         cnn_input = torch.cat([Yd.to(device), Yp4cnn.to(device), Hf], dim = 2)
                     else:
                         cnn_input = torch.cat([Yd.to(device), Hf], dim = 2)
-                    Ht = CNN(cnn_input).reshape(bs, 2, 4, 32).cpu()
+                    Ht = self.CNN(cnn_input).reshape(bs, 2, 4, 32).cpu()
                     Ht_list.append(Ht)
                     Hlabel_list.append(H_label.float())
                 Ht = torch.cat(Ht_list, dim = 0)
@@ -251,6 +261,7 @@ class EMAY2HRunner():
                         'fc': self.FC.state_dict(),
                         'epoch_num': epoch,
                     }
+                    best_nmse = loss.item()
                     torch.save(state_dicts, os.path.join(self.config.ckpt_dir, 'best_ema.pth'))
 
                 if epoch % self.config.save_freq == 0:
@@ -261,13 +272,13 @@ class EMAY2HRunner():
                     }
                     torch.save(state_dicts, fp)
                     logging.info(f'{fp} saved!')
-                self.backup()
+                self.restore()
                 if epoch % self.config.save_freq == 0:
                     fp = os.path.join(self.config.ckpt_dir, f'epoch{epoch}.pth')
                     state_dicts = {
-                        'cnn': self.CNN.state_dict()
+                        'cnn': self.CNN.state_dict(),
                         'fc': self.FC.state_dict()
                     }
-                    torch.save(state_dicts)
+                    torch.save(state_dicts, fp)
                     logging.info(f'{fp} saved!')
 
