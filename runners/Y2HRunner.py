@@ -122,9 +122,16 @@ class Y2HRunner():
             fp = os.path.join(f'/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_{self.mode}_Pn_{self.Pn}/CNN', \
                 self.config.train.CNN_resume, 'checkpoints/best.pth')
             state_dicts = torch.load(fp)
-            FC.load_state_dict(state_dicts['fc'])
+            # FC.load_state_dict(state_dicts['fc'])
             CNN.load_state_dict(state_dicts['cnn'])
-            logging.info(f'load state dicts of CNN and FC from {fp}')
+
+            fp2 = os.path.join(f'/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_{self.mode}_Pn_{self.Pn}/FC', \
+                self.config.train.FC_resume, 'checkpoints/best.pth')
+            try:
+                FC.load_state_dict(torch.load(fp2))
+            except:
+                FC.load_state_dict(torch.load(fp2)['fc'])
+            logging.info(f'load state dicts of CNN from {fp} and state dicts of FC from {fp2}')
         else:
             assert not self.config.train.FC_resume == 'None'
             fp = os.path.join(f'/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_{self.mode}_Pn_{self.Pn}/FC', self.config.train.FC_resume, 'checkpoints/best.pth')
@@ -164,8 +171,8 @@ class Y2HRunner():
                         cnn_input = torch.cat([Yd.to(device), Yp4cnn.to(device), Hf], dim = 2)
                     else:
                         cnn_input = torch.cat([Yd.to(device), Hf], dim = 2)
-                    # Ht = CNN(cnn_input).reshape(bs, 2, 4, 32).cpu()
-                    Ht = CNN(cnn_input).reshape(bs, 2, 32).cpu()
+                    Ht = CNN(cnn_input).reshape(bs, 2, 4, 32).cpu()
+                    # Ht = CNN(cnn_input).reshape(bs, 2, 32).cpu()
                     Ht_list.append(Ht)
                     Hlabel_list.append(H_label.float())
                 Ht = torch.cat(Ht_list, dim = 0)
@@ -212,8 +219,8 @@ class Y2HRunner():
                     cnn_input = torch.cat([Yd.to(device), Yp4cnn.to(device), Hf], dim = 2)
                 else:
                     cnn_input = torch.cat([Yd.to(device), Hf], dim = 2)
-                # Ht = CNN(cnn_input).reshape(bs, 2, 4, 32)
-                Ht = CNN(cnn_input).reshape(bs, 2, 32)
+                Ht = CNN(cnn_input).reshape(bs, 2, 4, 32)
+                # Ht = CNN(cnn_input).reshape(bs, 2, 32)
                 H_label = H_label.to(device)
 
                 loss = criterion(Ht, H_label)
