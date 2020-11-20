@@ -183,6 +183,60 @@ class EMAY2HRunner():
             
         logging.info('Everything prepared well, start to train...')
         for epoch in range(self.config.n_epochs):
+            self.CNN.eval()
+            self.FC.eval()
+            self.apply_shadow() # replace parameters of CNN with shadow parameters
+            with torch.no_grad():
+                Ht_list = []
+                Hlabel_list = []
+                for Yp4fc, Yp4cnn, Yd, X, H_label in val_loader:
+                    bs = Yp4fc.shape[0]
+                    Yp4fc = Yp4fc.to(device)
+                    Hf = self.FC(Yp4fc)
+                    Yp4fc = Yp4fc.cpu() # release gpu memory
+                    Hf = Hf.reshape(bs, 2, 4, 256)
+                    if self.config.use_yp:
+                        cnn_input = torch.cat([Yd.to(device), Yp4cnn.to(device), Hf], dim = 2)
+                    else:
+                        cnn_input = torch.cat([Yd.to(device), Hf], dim = 2)
+                    Ht = self.CNN(cnn_input).reshape(bs, 2, 4, 32).cpu()
+                    Ht_list.append(Ht)
+                    Hlabel_list.append(H_label.float())
+                Ht = torch.cat(Ht_list, dim = 0)
+                Hlabel = torch.cat(Hlabel_list, dim = 0)
+                loss = criterion(Ht, Hlabel)
+                
+                if loss < best_nmse:
+                    state_dicts = {
+                        'cnn': self.CNN.state_dict(),
+                        'fc': self.FC.state_dict(),
+                        'epoch_num': epoch,
+                    }
+                    best_nmse = loss.item()
+                    torch.save(state_dicts, os.path.join(self.config.ckpt_dir, 'best_ema.pth'))
+                logging.info(f'Validation Epoch [{epoch}]/[{self.config.n_epochs}] || NMSE {loss.item():.5f}, best nmse: {best_nmse:.5f}')
+
+                if epoch % self.config.save_freq == 0:
+                    fp = os.path.join(self.config.ckpt_dir, f'epoch{epoch}_ema.pth')
+                    state_dicts = {
+                        'cnn': self.CNN.state_dict(),
+                        'fc': self.FC.state_dict()
+                    }
+                    torch.save(state_dicts, fp)
+                    logging.info(f'{fp} saved!')
+                
+                self.restore()  # this must be set before save epoch checkpoint!
+                
+                if epoch % self.config.save_freq == 0:
+                    fp = os.path.join(self.config.ckpt_dir, f'epoch{epoch}.pth')
+                    state_dicts = {
+                        'cnn': self.CNN.state_dict(),
+                        'fc': self.FC.state_dict()
+                    }
+                    torch.save(state_dicts, fp)
+                    logging.info(f'{fp} saved!')
+
+
             current_lr = optimizer_CNN.param_groups[0]['lr']
             if symbol:
                 current_fc_lr = optimizer_FC.param_groups[0]['lr']
@@ -231,54 +285,4 @@ class EMAY2HRunner():
                     if symbol:
                         optimizer_FC.param_groups[0]['lr'] =  self.config.lr_threshold
 
-            self.CNN.eval()
-            self.FC.eval()
-            self.apply_shadow() # replace parameters of CNN with shadow parameters
-            with torch.no_grad():
-                Ht_list = []
-                Hlabel_list = []
-                for Yp4fc, Yp4cnn, Yd, X, H_label in val_loader:
-                    bs = Yp4fc.shape[0]
-                    Yp4fc = Yp4fc.to(device)
-                    Hf = self.FC(Yp4fc)
-                    Yp4fc = Yp4fc.cpu() # release gpu memory
-                    Hf = Hf.reshape(bs, 2, 4, 256)
-                    if self.config.use_yp:
-                        cnn_input = torch.cat([Yd.to(device), Yp4cnn.to(device), Hf], dim = 2)
-                    else:
-                        cnn_input = torch.cat([Yd.to(device), Hf], dim = 2)
-                    Ht = self.CNN(cnn_input).reshape(bs, 2, 4, 32).cpu()
-                    Ht_list.append(Ht)
-                    Hlabel_list.append(H_label.float())
-                Ht = torch.cat(Ht_list, dim = 0)
-                Hlabel = torch.cat(Hlabel_list, dim = 0)
-                loss = criterion(Ht, Hlabel)
-                
-                if loss < best_nmse:
-                    state_dicts = {
-                        'cnn': self.CNN.state_dict(),
-                        'fc': self.FC.state_dict(),
-                        'epoch_num': epoch,
-                    }
-                    best_nmse = loss.item()
-                    torch.save(state_dicts, os.path.join(self.config.ckpt_dir, 'best_ema.pth'))
-                logging.info(f'Epoch [{epoch}]/[{self.config.n_epochs}] || NMSE {loss.item():.5f}, best nmse: {best_nmse:.5f}')
-
-                if epoch % self.config.save_freq == 0:
-                    fp = os.path.join(self.config.ckpt_dir, f'epoch{epoch}_ema.pth')
-                    state_dicts = {
-                        'cnn': self.CNN.state_dict(),
-                        'fc': self.FC.state_dict()
-                    }
-                    torch.save(state_dicts, fp)
-                    logging.info(f'{fp} saved!')
-                self.restore()
-                if epoch % self.config.save_freq == 0:
-                    fp = os.path.join(self.config.ckpt_dir, f'epoch{epoch}.pth')
-                    state_dicts = {
-                        'cnn': self.CNN.state_dict(),
-                        'fc': self.FC.state_dict()
-                    }
-                    torch.save(state_dicts, fp)
-                    logging.info(f'{fp} saved!')
-
+            
