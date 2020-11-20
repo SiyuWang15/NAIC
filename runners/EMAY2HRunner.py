@@ -35,7 +35,7 @@ class EMAY2HRunner():
             raise NotImplementedError(f'model {self.config.cnnmodel} not implememted!')
         if not self.config.train.CNN_resume == 'None':
             fp = os.path.join(f'/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_{self.mode}_Pn_{self.Pn}/CNN', \
-                self.config.train.CNN_resume, 'checkpoints/epoch10.pth')
+                self.config.train.CNN_resume, 'checkpoints/best.pth')
             state_dicts = torch.load(fp)
             FC.load_state_dict(state_dicts['fc'])
             CNN.load_state_dict(state_dicts['cnn'])
@@ -85,10 +85,11 @@ class EMAY2HRunner():
             raise NotImplementedError('Optimizer {} not understood.'.format(self.config.train.optimizer))
 
     def run(self):
-        if self.config.model == 'fc':
-            self.train_FC()
-        elif self.config.model == 'cnn':
-            self.train_CNN()
+        # if self.config.model == 'fc':
+        #     self.train_FC()
+        # elif self.config.model == 'cnn':
+        #     self.train_CNN()
+        self.train_CNN()
     
     def get_dataloader(self):
         train_set, val_set = get_YH_data_random(self.mode, self.Pn)
