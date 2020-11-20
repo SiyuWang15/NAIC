@@ -149,7 +149,47 @@ class Y2HRunner():
             
         logging.info('Everything prepared well, start to train...')
         for epoch in range(self.config.n_epochs):
-            print('=================================')
+            CNN.eval()
+            FC.eval()
+            with torch.no_grad():
+                Ht_list = []
+                Hlabel_list = []
+                for Yp4fc, Yp4cnn, Yd, X, H_label in val_loader:
+                    bs = Yp4fc.shape[0]
+                    Yp4fc = Yp4fc.to(device)
+                    Hf = FC(Yp4fc)
+                    Yp4fc = Yp4fc.cpu() # release gpu memory
+                    Hf = Hf.reshape(bs, 2, 4, 256)
+                    if self.config.use_yp:
+                        cnn_input = torch.cat([Yd.to(device), Yp4cnn.to(device), Hf], dim = 2)
+                    else:
+                        cnn_input = torch.cat([Yd.to(device), Hf], dim = 2)
+                    # Ht = CNN(cnn_input).reshape(bs, 2, 4, 32).cpu()
+                    Ht = CNN(cnn_input).reshape(bs, 2, 32).cpu()
+                    Ht_list.append(Ht)
+                    Hlabel_list.append(H_label.float())
+                Ht = torch.cat(Ht_list, dim = 0)
+                Hlabel = torch.cat(Hlabel_list, dim = 0)
+                loss = criterion(Ht, Hlabel)
+                if loss < best_nmse:
+                    best_nmse = loss.item()
+                    state_dicts = {
+                        'cnn': CNN.state_dict(),
+                        'fc': FC.state_dict(),
+                        'epoch_num': epoch
+                    }
+                    torch.save(state_dicts, os.path.join(self.config.ckpt_dir, f'best.pth'))
+                if epoch % self.config.save_freq == 0:
+                    fp = os.path.join(self.config.ckpt_dir, f'epoch{epoch}.pth')
+                    state_dicts = {
+                        'cnn': CNN.state_dict(),
+                        'fc': FC.state_dict()
+                    }
+                    torch.save(state_dicts, fp)
+                    logging.info(f'{fp} saved.')
+                logging.info(f'Epoch [{epoch}]/[{self.config.n_epochs}] || NMSE {loss.item():.5f}, best nmse: {best_nmse:.5f}')
+                
+                
             current_lr = optimizer_CNN.param_groups[0]['lr']
             if symbol:
                 current_fc_lr = optimizer_FC.param_groups[0]['lr']
@@ -197,42 +237,4 @@ class Y2HRunner():
                     if symbol:
                         optimizer_FC.param_groups[0]['lr'] =  self.config.lr_threshold
 
-            CNN.eval()
-            FC.eval()
-            with torch.no_grad():
-                Ht_list = []
-                Hlabel_list = []
-                for Yp4fc, Yp4cnn, Yd, X, H_label in val_loader:
-                    bs = Yp4fc.shape[0]
-                    Yp4fc = Yp4fc.to(device)
-                    Hf = FC(Yp4fc)
-                    Yp4fc = Yp4fc.cpu() # release gpu memory
-                    Hf = Hf.reshape(bs, 2, 4, 256)
-                    if self.config.use_yp:
-                        cnn_input = torch.cat([Yd.to(device), Yp4cnn.to(device), Hf], dim = 2)
-                    else:
-                        cnn_input = torch.cat([Yd.to(device), Hf], dim = 2)
-                    # Ht = CNN(cnn_input).reshape(bs, 2, 4, 32).cpu()
-                    Ht = CNN(cnn_input).reshape(bs, 2, 32).cpu()
-                    Ht_list.append(Ht)
-                    Hlabel_list.append(H_label.float())
-                Ht = torch.cat(Ht_list, dim = 0)
-                Hlabel = torch.cat(Hlabel_list, dim = 0)
-                loss = criterion(Ht, Hlabel)
-                if loss < best_nmse:
-                    best_nmse = loss.item()
-                    state_dicts = {
-                        'cnn': CNN.state_dict(),
-                        'fc': FC.state_dict(),
-                        'epoch_num': epoch
-                    }
-                    torch.save(state_dicts, os.path.join(self.config.ckpt_dir, f'best.pth'))
-                if epoch % self.config.save_freq == 0:
-                    fp = os.path.join(self.config.ckpt_dir, f'epoch{epoch}.pth')
-                    state_dicts = {
-                        'cnn': CNN.state_dict(),
-                        'fc': FC.state_dict()
-                    }
-                    torch.save(state_dicts, fp)
-                    logging.info(f'{fp} saved.')
-                logging.info(f'Epoch [{epoch}]/[{self.config.n_epochs}] || NMSE {loss.item():.5f}, best nmse: {best_nmse:.5f}')
+            
