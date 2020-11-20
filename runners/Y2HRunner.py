@@ -122,16 +122,8 @@ class Y2HRunner():
             fp = os.path.join(f'/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_{self.mode}_Pn_{self.Pn}/CNN', \
                 self.config.train.CNN_resume, 'checkpoints/best.pth')
             state_dicts = torch.load(fp)
-            # FC.load_state_dict(state_dicts['fc'])
             CNN.load_state_dict(state_dicts['cnn'])
-
-            fp2 = os.path.join(f'/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_{self.mode}_Pn_{self.Pn}/FC', \
-                self.config.train.FC_resume, 'checkpoints/best.pth')
-            try:
-                FC.load_state_dict(torch.load(fp2))
-            except:
-                FC.load_state_dict(torch.load(fp2)['fc'])
-            logging.info(f'load state dicts of CNN from {fp} and state dicts of FC from {fp2}')
+            logging.info(f'load state dicts of CNN and FC from {fp}.')
         else:
             assert not self.config.train.FC_resume == 'None'
             fp = os.path.join(f'/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_{self.mode}_Pn_{self.Pn}/FC', self.config.train.FC_resume, 'checkpoints/best.pth')
@@ -194,7 +186,7 @@ class Y2HRunner():
                     }
                     torch.save(state_dicts, fp)
                     logging.info(f'{fp} saved.')
-                logging.info(f'Epoch [{epoch}]/[{self.config.n_epochs}] || NMSE {loss.item():.5f}, best nmse: {best_nmse:.5f}')
+                logging.info(f'Validation Epoch [{epoch}]/[{self.config.n_epochs}] || NMSE {loss.item():.5f}, best nmse: {best_nmse:.5f}')
                 
                 
             current_lr = optimizer_CNN.param_groups[0]['lr']
