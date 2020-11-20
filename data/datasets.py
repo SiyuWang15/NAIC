@@ -42,8 +42,7 @@ class RandomDataset():
         Yp4fc = Yp.reshape(-1)
         XX = np.concatenate([bits0, bits1], 0).astype('float32')
         newHH = np.stack([HH.real, HH.imag], axis = 0).astype('float32')  # 2x4x32
-        return Yp4fc, Yp4cnn, Yd, XX, newHH[:, 0, :] 
-
+        return Yp4fc, Yp4cnn, Yd, XX, newHH
     def __len__(self):
         return len(self.H)
         # return 2000
