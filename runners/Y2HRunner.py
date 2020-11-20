@@ -123,6 +123,7 @@ class Y2HRunner():
                 self.config.train.CNN_resume, 'checkpoints/best.pth')
             state_dicts = torch.load(fp)
             CNN.load_state_dict(state_dicts['cnn'])
+            FC.load_state_dict(state_dicts['fc'])
             logging.info(f'load state dicts of CNN and FC from {fp}.')
         else:
             assert not self.config.train.FC_resume == 'None'
