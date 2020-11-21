@@ -135,9 +135,3 @@ class FullRunner():
         dp = os.path.join(self.config.log_dir, f'X_pre_{tag}.bin')
         predXs.tofile(dp)
         logging.info(f'Complete! Results saved at {dp}')
-
-    def NMSE(self, H_pred, H_label):
-        mse = np.power(H_pred-H_label, 2).sum()
-        norm = np.power(H_label, 2).sum()
-        return mse / norm
-    
