@@ -27,8 +27,13 @@ class FullRunner():
     def get_model(self, device):
         CNN = CNN_Estimation()
         FC = FC_ELU_Estimation(self.FCconf.in_dim, self.FCconf.h_dim, self.FCconf.out_dim, self.FCconf.n_blocks)
-        fp = os.path.join(f'/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_{self.mode}_Pn_{self.Pn}/CNN',\
+        if self.config.model == 'cnn':
+            fp = os.path.join(f'/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_{self.mode}_Pn_{self.Pn}/CNN',\
              self.config.resume, 'checkpoints/best.pth')
+        elif self.config.model == 'ema':
+            fp = os.path.join(f'/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_{self.mode}_Pn_{self.Pn}/EMA',\
+             self.config.resume, 'checkpoints/best_ema.pth')
+        
         logging.info(f'loading state dicts from [{fp}]')
         state_dicts = torch.load(fp)
         FC.load_state_dict(state_dicts['fc'])
@@ -99,7 +104,7 @@ class FullRunner():
         FC.eval()
         CNN.eval()
         Y = get_test_data(self.Pn) # 10000x2x2x256
-        bs = 200
+        bs = 500
         predXs = []
         for i in range(int(len(Y) / bs)):
             YY = Y[i*bs:(i+1)*bs, :]
