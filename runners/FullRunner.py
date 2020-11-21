@@ -28,9 +28,14 @@ class FullRunner():
     def get_model(self, device):
         CNN = CNN_Estimation()
         FC = FC_ELU_Estimation(self.FCconf.in_dim, self.FCconf.h_dim, self.FCconf.out_dim, self.FCconf.n_blocks)
-        fp = os.path.join(f'/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_{self.mode}_Pn_{self.Pn}/CNN',\
+        if self.config.model == 'cnn':
+            fp = os.path.join(f'/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_{self.mode}_Pn_{self.Pn}/CNN',\
              self.config.resume, 'checkpoints/best.pth')
         shutil.copy(fp, os.path.join(self.config.log_dir, 'best.pth'))
+        elif self.config.model == 'ema':
+            fp = os.path.join(f'/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_{self.mode}_Pn_{self.Pn}/EMA',\
+             self.config.resume, 'checkpoints/best_ema.pth')
+        
         logging.info(f'loading state dicts from [{fp}]')
         state_dicts = torch.load(fp)
         FC.load_state_dict(state_dicts['fc'])
