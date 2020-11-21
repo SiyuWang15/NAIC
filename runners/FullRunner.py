@@ -31,10 +31,11 @@ class FullRunner():
         if self.config.model == 'cnn':
             fp = os.path.join(f'/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_{self.mode}_Pn_{self.Pn}/CNN',\
              self.config.resume, 'checkpoints/best.pth')
-        shutil.copy(fp, os.path.join(self.config.log_dir, 'best.pth'))
         elif self.config.model == 'ema':
             fp = os.path.join(f'/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_{self.mode}_Pn_{self.Pn}/EMA',\
              self.config.resume, 'checkpoints/best_ema.pth')
+
+        shutil.copy(fp, os.path.join(self.config.log_dir, 'best.pth'))
 
         logging.info(f'loading state dicts from [{fp}]')
         state_dicts = torch.load(fp)
