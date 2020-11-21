@@ -99,7 +99,7 @@ class FullRunner():
         FC.eval()
         CNN.eval()
         Y = get_test_data(self.Pn) # 10000x2x2x256
-        bs = 200
+        bs = 500
         predXs = []
         for i in range(int(len(Y) / bs)):
             YY = Y[i*bs:(i+1)*bs, :]

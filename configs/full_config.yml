@@ -3,11 +3,11 @@ cnnmodel: base # base or resnet34 or resnet50
 Pn: 8
 mode: 0
 use_yp: True
-batch_size: 200
+batch_size: 500
 FC:
   in_dim: 1024
   h_dim: 4096
   out_dim: 2048
   n_blocks: 2
-resume: 1118-16-48-49
+resume: 1120-14-53-06
 run_mode: validation  # validation or testing
