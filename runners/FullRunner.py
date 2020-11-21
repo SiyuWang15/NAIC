@@ -35,7 +35,7 @@ class FullRunner():
         elif self.config.model == 'ema':
             fp = os.path.join(f'/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_{self.mode}_Pn_{self.Pn}/EMA',\
              self.config.resume, 'checkpoints/best_ema.pth')
-             
+
         logging.info(f'loading state dicts from [{fp}]')
         state_dicts = torch.load(fp)
         FC.load_state_dict(state_dicts['fc'])
@@ -53,7 +53,7 @@ class FullRunner():
     def NMSE(self, H_pred, H_label):
         mse = np.power(H_pred - H_label, 2).sum()
         norm = np.power(H_label, 2).sum()
-        return nmse / norm
+        return mse / norm
     
     def validation(self):
         device = 'cuda'
