@@ -6,7 +6,7 @@ from argparse import Namespace
 from utils import set_logger, seed_everything, get_config, arg_parser
 from multiprocessing import Pool
 
-from runners import Y2HRunner, FullRunner,  EMAY2HRunner
+from runners import Y2HRunner, FullRunner,  EMAY2HRunner, DenoiserRunner
 
 def run_y2h(args):
     config = get_config(f'./configs/y2h_config_{args.run_mode}.yml')
@@ -20,6 +20,17 @@ def run_y2h(args):
     set_logger(config)
     logging.info(config)
     runner = Y2HRunner(config)
+    runner.run()
+
+def run_denoiser(args):
+    config = get_config(f'./configs/denoiser_config.yml')
+    config.log_prefix = f'workspace/denoiser/mode_{config.mode}_Pn_{config.Pn}/'
+    config.log_dir = os.path.join(config.log_prefix, args.time)
+    config.ckpt_dir = os.path.join(config.log_dir, 'checkpoints')
+    os.makedirs(config.ckpt_dir)
+    set_logger(config)
+    logging.info(config)
+    runner = DenoiserRunner(config)
     runner.run()
 
 def run_ema(args):
@@ -56,3 +67,5 @@ if __name__ == "__main__":
         run_full(args)
     elif args.runner == 'ema':
         run_ema(args)
+    elif args.runner == 'denoiser':
+        run_denoiser(args)

@@ -1,0 +1,14 @@
+mode: 0
+Pn: 8
+model: resnet18 # unet resnet18
+n_epochs: 300
+print_freq: 100
+save_freq: 10
+lr_decay: 50
+lr_threshold: 0.00001
+train:
+  lr: 0.0003
+  train_batch_size: 512 # 256 for resnet34, 512 for base
+  val_batch_size: 1000
+  resume: None
+  optimizer: adam
