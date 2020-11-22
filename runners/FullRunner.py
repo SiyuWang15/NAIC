@@ -11,7 +11,7 @@ import sys
 import time
 sys.path.append('..')
 from utils import *
-from func import *
+from func import SoftMLReceiver as MLReceiver
 from Estimators import CNN_Estimation, FC_ELU_Estimation, NMSELoss
 from data import get_test_data, get_val_data
 
