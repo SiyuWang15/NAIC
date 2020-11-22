@@ -6,6 +6,20 @@ import os
 import time
 
 
+def MakeCodebook(G = 4):
+    assert type(G) == int
+
+    codebook = np.zeros((G, 2**G))
+    for idx in range(2**G):
+        n = idx
+        for i in range(G):
+            r = n % 2
+            codebook[G -1- i, idx] = r
+            n = n//2
+
+    return codebook
+
+
 def SoftMLReceiver_single_process(q, label, Y, H, SNRdb = 10):
     # 输入：
     # Y : frequency domain 复数 (batch * 2 * 256) [样本数 * 天线数 * 子载波数]
@@ -34,8 +48,8 @@ def SoftMLReceiver_single_process(q, label, Y, H, SNRdb = 10):
 
     sigma2 = 0.35 * 10 ** (-SNRdb / 10)
     for num in range(batch):
-        if num % 100 == 0:
-            print('Completed batches [%d]/[%d]'%(num ,batch), time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
+        # if num % 100 == 0:
+        #     print('Completed batches [%d]/[%d]'%(num ,batch), time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
         for idx in range(256):
             y = Y[num, :, idx:idx+1]
             h = H[num, :, :, idx]
@@ -84,9 +98,9 @@ def SoftMLReceiver_single_process(q, label, Y, H, SNRdb = 10):
     X_bits = np.reshape(X_bits, [batch, 1024])
 
     q[label] = (X_ML, X_bits)
-    print('P{0} completed!'.format(label))
+    # print('P{0} completed!'.format(label))
 
-def SoftMLReceiver(Y, H, Codebook = MakeCodebook(4), SNRdb = 7, num_workers = 16):
+def SoftMLReceiver(Y, H, Codebook = MakeCodebook(4), SNRdb = 8., num_workers = 16):
     # 输入：
     # Y : frequency domain 复数 (batch * 2 * 256) [样本数 * 天线数 * 子载波数]
     # H : frequency domain 复数 (batch * 2 * 2 * 256) [样本数 * 接收天线数 * 发射天线数 * 子载波数]
@@ -233,19 +247,6 @@ def MLReceiver_single_process(q, label, Y, H, Codebook):
     X_bits = np.reshape(X_bits, [batch, 1024])
     q[label] = (X_ML, X_bits)
         # print('P{0} completed!'.format(label))
-
-def MakeCodebook(G = 4):
-    assert type(G) == int
-
-    codebook = np.zeros((G, 2**G))
-    for idx in range(2**G):
-        n = idx
-        for i in range(G):
-            r = n % 2
-            codebook[G -1- i, idx] = r
-            n = n//2
-
-    return codebook
 
 
 
