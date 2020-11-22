@@ -96,3 +96,14 @@ def process_H(H): # bs x 2 x 4 x 32
 
 def process_Y(Y): # bsx2x2x256
     return real2complex(Y, 'Yd')
+
+def extract(Y): # bsx1x8x256
+    Yp = Y[:, 0, :4, :] # bsx4x256
+    Ypreal = np.stack([Yp[:, 0, :], Yp[:, 2, :]], axis = 1) # bsx2x256
+    Ypimag = np.stack([Yp[:, 1, :], Yp[:, 3, :]], axis = 1)
+    Yp = np.stack([Ypreal, Ypimag], axis = 1) # bsx2x2x256
+    Yd = Y[:, 0, 4:, :]
+    Ydreal = np.stack([Yd[:, 0, :], Yd[:, 2, :]], axis = 1)
+    Ydimag = np.stack([Yd[:, 1, :], Yd[:, 3, :]], axis = 1)
+    Yd = np.stack([Ydreal, Ydimag], axis = 1)
+    return torch.Tensor(Yp), torch.Tensor(Yd)

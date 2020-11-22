@@ -148,7 +148,7 @@ class Decoder(nn.Module):
         # x = x.view(x.size(0), 2, 16, 32)
         return x
 
-class Unet(nn.Module):
+class Denoise_Unet(nn.Module):
 
     def __init__(self):
         super().__init__()
@@ -158,7 +158,7 @@ class Unet(nn.Module):
     def forward(self, x):
         x = self.encoder(x)
         x = self.decoder(x)
-        return out
+        return x
 
 
 class BasicBlock(nn.Module):
@@ -190,9 +190,9 @@ class BasicBlock(nn.Module):
         return out
 
 
-class Resnet18(nn.Module):
+class Denoise_Resnet18(nn.Module):
     def __init__(self, block=BasicBlock, num_blocks=[2,2,2,2], num_classes=2048):
-        super(Resnet18, self).__init__()
+        super().__init__()
         self.in_planes = 64
 
         self.conv1 = nn.Conv2d(1, 64, kernel_size=3,

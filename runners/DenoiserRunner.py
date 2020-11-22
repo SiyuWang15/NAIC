@@ -7,7 +7,7 @@ import logging
 import os
 import sys
 sys.path.append('..')
-from Estimators import Unet, Resnet18
+from Estimators import Denoise_Unet, Denoise_Resnet18
 from data import get_denoise_data
 from utils import *
 
@@ -38,9 +38,9 @@ class DenoiserRunner():
         train_loader, val_loader = self.get_dataloader()
 
         if self.config.model == 'unet':
-            model = Unet().to(device)
+            model = Denoise_Unet().to(device)
         elif self.config.model == 'resnet18':
-            model = Resnet18().to(device)
+            model = Denoise_Resnet18().to(device)
         else:
             raise NotImplementedError
         if not self.config.train.resume == 'None':
@@ -82,6 +82,8 @@ class DenoiserRunner():
                     logging.info(f'{fp} saved.')
 
             model.train()
+            current_lr = optimizer.param_groups[0]['lr']
+            logging.info(f'Epoch [{epoch}]/[{self.config.n_epochs}] learning rate: {current_lr:.4e}')
             for it, (Y, Y_label) in enumerate(train_loader):
                 optimizer .zero_grad()
                 Y = Y.to(device)

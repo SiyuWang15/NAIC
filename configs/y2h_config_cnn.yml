@@ -6,6 +6,7 @@ use_yp: True
 n_epochs: 300
 print_freq: 100
 save_freq: 10
+eval_freq: 50
 lr_decay: 50
 lr_threshold: 0.00001
 train:
@@ -13,8 +14,9 @@ train:
   fc_lr: 0.0001
   train_batch_size: 512 # 256 for resnet34, 512 for base
   val_batch_size: 1000
-  FC_resume: finetune # 1118-15-33-37 for Pn 32 1118-00-36-40 for Pn 8
-  CNN_resume: None #1118-16-48-49 # 1118-01-07-26
+  FC_resume: None # 1118-15-33-37 for Pn 32 1118-00-36-40 for Pn 8
+  CNN_resume: 1121-15-28-33 #1118-16-48-49 # 1118-01-07-26
+  denoiser_resume: 1122-00-41-08
   freeze_FC: True
   optimizer: adam
 FC:

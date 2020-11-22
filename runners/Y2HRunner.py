@@ -7,10 +7,10 @@ import logging
 import os
 import sys
 sys.path.append('..')
-from Estimators import CNN_Estimation, FC_ELU_Estimation, NMSELoss, ResNet34, ResNet50
+from Estimators import CNN_Estimation, FC_ELU_Estimation, NMSELoss, ResNet34, ResNet50, Denoise_Resnet18
 from data import get_YH_data_random
 from utils import *
-
+from func import MLReceiver
 class Y2HRunner():
     def __init__(self, config, cnn:bool=False):
         self.config = config
@@ -24,12 +24,6 @@ class Y2HRunner():
             return optim.SGD(parameters, lr = lr, momentum=0.9)
         else:
             raise NotImplementedError('Optimizer {} not understood.'.format(self.config.train.optimizer))
-
-    def run(self):
-        if self.config.model == 'fc':
-            self.train_FC()
-        elif self.config.model == 'cnn':
-            self.train_CNN()
     
     def get_dataloader(self):
         train_set, val_set = get_YH_data_random(self.mode, self.Pn)
@@ -38,73 +32,21 @@ class Y2HRunner():
         val_loader = DataLoader(val_set, batch_size=self.config.train.val_batch_size, \
             shuffle=False, num_workers=16, drop_last=False)
         return train_loader, val_loader
+    
+    def evaluation(self, Ht, Yd, X):
+        # Ht bsx2x4x32 must be on cpu
+        X = X.numpy()
+        Ht = Ht.numpy()
+        Ht = Ht[:, 0, :, :] + 1j * Ht[:, 1, :, :]
+        Hf = np.fft.fft(Ht, 256) / 20.
+        Hf = np.reshape(Hf, [len(Ht), 2, 2, 256], order = 'F')
+        Yd = Yd.numpy()
+        Yd = Yd[:, 0, :, :] + 1j*Yd[:, 1, :, :]
+        _, predX = MLReceiver(Yd, Hf)
+        acc = (X == predX).astype('float32').mean()
+        return acc
 
-    def train_FC(self):
-        device = 'cuda'
-        train_loader, val_loader = self.get_dataloader()
-        logging.info('Data Loaded!')
-        FC = FC_ELU_Estimation(self.config.FC.in_dim, self.config.FC.h_dim, self.config.FC.out_dim, self.config.FC.n_blocks)
-        if not self.config.train.FC_resume == 'None':
-            fp = os.path.join(f'/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_{self.mode}_Pn_{self.Pn}/FC', self.config.train.FC_resume, 'checkpoints/best.pth')
-            try:
-                FC.load_state_dict(torch.load(fp))
-            except:
-                FC.load_state_dict(torch.load(fp)['fp'])
-            logging.info(f'Loading state dict of FC from {self.config.train.FC_resume}')
-        FC.to(device)
-
-        criterion = NMSELoss()
-        optimizer = self.get_optimizer(FC.parameters(), self.config.train.fc_lr)
-        best_nmse = 1000.
-
-        logging.info('Everything prepared well, start to train...')
-
-        for epoch in range(self.config.n_epochs):
-            current_lr = optimizer.param_groups[0]['lr']
-            logging.info(f'Epoch [{epoch}]/[{self.config.n_epochs}] learning rate: {current_lr:.4e}')
-
-            FC.train()
-            for it, (Yp4fc, _, _, _, H_label) in enumerate(train_loader):
-                bs = len(Yp4fc)
-                optimizer.zero_grad()
-                # 真实的频域信道，获取标签
-                Hf_label = process_H(H_label).to(device)
-                # 第一层网络输入
-                Yp4fc = Yp4fc.to(device)
-                Hf = FC(Yp4fc).reshape(bs, 2, 4, 256)
-                # 计算loss
-                loss = criterion(Hf, Hf_label)
-                loss.backward()
-                optimizer.step()
-                if it % self.config.print_freq == 0:
-                    # print(nmse)
-                    logging.info(f'Mode:{self.mode} || Epoch: [{epoch}/{self.config.n_epochs}][{it}/{len(train_loader)}]\t Loss {loss.item():.5f}')
-            FC.eval()
-            with torch.no_grad():
-                Hf_list = []
-                Hflabel_list = []
-                for Yp4fc, _, _, _, H_label in val_loader:
-                    bs = Yp4fc.shape[0]
-                    # 真实的频域信道，获取标签
-                    H_label = process_H(H_label)
-
-                    Yp4fc = Yp4fc.to(device)
-                    Hf = FC(Yp4fc).reshape(bs, 2, 4, 256).cpu()
-                    Hf_list.append(Hf)
-                    Hflabel_list.append(H_label)
-                Hf = torch.cat(Hf_list, dim = 0)
-                Hflabel = torch.cat(Hflabel_list, dim = 0)
-                loss = criterion(Hf, Hflabel)
-
-                fp = os.path.join(self.config.ckpt_dir, f'epoch{epoch}.pth')
-                torch.save({'fc': FC.state_dict()}, fp)
-                if loss < best_nmse:
-                    torch.save({'fc': FC.state_dict()}, os.path.join(self.config.ckpt_dir, 'best.pth'))
-                    best_nmse = loss.item()
-                logging.info(f'{fp} saved!')
-                logging.info(f'Epoch [{epoch}]/[{self.config.n_epochs}] || NMSE {loss.item():.5f}, best nmse: {best_nmse:.5f}')
-
-    def train_CNN(self):
+    def run(self):
         device = 'cuda'
         train_set, val_set = get_YH_data_random(self.mode, self.Pn)
         train_loader, val_loader = self.get_dataloader()
@@ -140,13 +82,19 @@ class Y2HRunner():
             logging.info('Freeze FC layer.')
             FC.eval()
         
+        denoiser = Denoise_Resnet18()
+        # denoiser.to(device)
+        fp = f'/data/siyu/NAIC/workspace/denoiser/mode_{self.mode}_Pn_{self.Pn}/{self.config.train.denoiser_resume}/checkpoints/best.pth'
+        denoiser.load_state_dict(torch.load(fp)['denoiser'])
+        denoiser.eval()
+        for param in denoiser.parameters():
+            param.requires_grad = False
+        logging.info('Freeze Denoiser.')
+
         best_nmse = 1000.
         criterion = NMSELoss()
         optimizer_CNN = self.get_optimizer(CNN.parameters(), self.config.train.cnn_lr)
-        symbol = not self.config.train.freeze_FC
-        if symbol:
-            optimizer_FC = self.get_optimizer(FC.parameters(), self.config.train.fc_lr)
-            
+        
         logging.info('Everything prepared well, start to train...')
         for epoch in range(self.config.n_epochs):
             CNN.eval()
@@ -154,22 +102,29 @@ class Y2HRunner():
             with torch.no_grad():
                 Ht_list = []
                 Hlabel_list = []
-                for Yp4fc, Yp4cnn, Yd, X, H_label in val_loader:
-                    bs = Yp4fc.shape[0]
-                    Yp4fc = Yp4fc.to(device)
-                    Hf = FC(Yp4fc)
-                    Yp4fc = Yp4fc.cpu() # release gpu memory
+                X_label = []
+                Yd_list = []
+                for Y, Ylabel, Yp4fc, X, H_label in val_loader:
+                    bs = Y.shape[0]
+                    dY = denoiser(Y).reshape(bs, 1, 8, 256).detach().numpy() # this is on cpu
+                    denoise_mse = nn.MSELoss()(torch.Tensor(dY), Ylabel)
+                    # print(f'denoise mse: {denoise_mse}')
+                    Yp4cnn, Yd = extract(dY) # bsx2x2x256
+                    Hf = FC(Yp4fc.to(device))
                     Hf = Hf.reshape(bs, 2, 4, 256)
-                    if self.config.use_yp:
-                        cnn_input = torch.cat([Yd.to(device), Yp4cnn.to(device), Hf], dim = 2)
-                    else:
-                        cnn_input = torch.cat([Yd.to(device), Hf], dim = 2)
+
+                    cnn_input = torch.cat([Yd.to(device), Yp4cnn.to(device), Hf], dim = 2)
+
                     Ht = CNN(cnn_input).reshape(bs, 2, 4, 32).cpu()
                     # Ht = CNN(cnn_input).reshape(bs, 2, 32).cpu()
                     Ht_list.append(Ht)
                     Hlabel_list.append(H_label.float())
+                    Yd_list.append(Yd)
+                    X_label.append(X)
                 Ht = torch.cat(Ht_list, dim = 0)
                 Hlabel = torch.cat(Hlabel_list, dim = 0)
+                Yd = torch.cat(Yd_list, dim = 0)
+                Xlabel = torch.cat(X_label, dim = 0)
                 loss = criterion(Ht, Hlabel)
                 if loss < best_nmse:
                     best_nmse = loss.item()
@@ -179,6 +134,7 @@ class Y2HRunner():
                         'epoch_num': epoch
                     }
                     torch.save(state_dicts, os.path.join(self.config.ckpt_dir, f'best.pth'))
+                logging.info(f'Validation Epoch [{epoch}]/[{self.config.n_epochs}] || NMSE {loss.item():.5f}, best nmse: {best_nmse:.5f}')
                 if epoch % self.config.save_freq == 0:
                     fp = os.path.join(self.config.ckpt_dir, f'epoch{epoch}.pth')
                     state_dicts = {
@@ -187,54 +143,38 @@ class Y2HRunner():
                     }
                     torch.save(state_dicts, fp)
                     logging.info(f'{fp} saved.')
-                logging.info(f'Validation Epoch [{epoch}]/[{self.config.n_epochs}] || NMSE {loss.item():.5f}, best nmse: {best_nmse:.5f}')
+                if epoch % self.config.eval_freq == 0 and epoch > 0:
+                    acc = self.evaluation(Ht, Yd, Xlabel)
+                    logging.info(f'Evaluation Epoch [{epoch}], acc: {acc:.5f}')
                 
                 
             current_lr = optimizer_CNN.param_groups[0]['lr']
-            if symbol:
-                current_fc_lr = optimizer_FC.param_groups[0]['lr']
-                logging.info(f'Epoch [{epoch}]/[{self.config.n_epochs}] cnn learning rate: {current_lr:.4e}, fc learning rate: {current_fc_lr:.4e}')
-            else:
-                logging.info(f'Epoch [{epoch}]/[{self.config.n_epochs}] learning rate: {current_lr:.4e}')
+            
+            logging.info(f'Epoch [{epoch}]/[{self.config.n_epochs}] learning rate: {current_lr:.4e}')
             # model training
             CNN.train()
-            if symbol:
-                FC.train()
 
-            for it, (Yp4fc, Yp4cnn, Yd, X, H_label) in enumerate(train_loader): # H_train: bsx2(real and imag)x4x32
+            for it, (Y, Ylabel, Yp4fc, X, H_label) in enumerate(train_loader): # H_train: bsx2(real and imag)x4x32
                 bs = Yp4fc.shape[0]
+                dY = denoiser(Y).reshape(bs, 1, 8, 256).detach().numpy()
                 optimizer_CNN.zero_grad()
                 Yp4fc = Yp4fc.to(device)
                 Hf = FC(Yp4fc)
                 Yp4fc = Yp4fc.cpu() # release gpu memory
                 Hf = Hf.reshape(bs, 2, 4, 256)
-                if self.config.use_yp:
-                    cnn_input = torch.cat([Yd.to(device), Yp4cnn.to(device), Hf], dim = 2)
-                else:
-                    cnn_input = torch.cat([Yd.to(device), Hf], dim = 2)
-                Ht = CNN(cnn_input).reshape(bs, 2, 4, 32)
-                # Ht = CNN(cnn_input).reshape(bs, 2, 32)
-                H_label = H_label.to(device)
+                Yp4cnn, Yd = extract(dY)
 
+                cnn_input = torch.cat([Yd.to(device), Yp4cnn.to(device), Hf], dim = 2)
+                Ht = CNN(cnn_input).reshape(bs, 2, 4, 32)
+                H_label = H_label.to(device)
                 loss = criterion(Ht, H_label)
                 loss.backward()
                 optimizer_CNN.step()
-                if symbol:
-                    optimizer_FC.step()
-
                 if it % self.config.print_freq == 0:
                     # print(nmse)
                     logging.info(f'CNN Mode:{self.mode} || Epoch: [{epoch}/{self.config.n_epochs}][{it}/{len(train_loader)}]\t Loss {loss.item():.5f}')
 
-            if epoch >0:
-                if epoch % self.config.lr_decay ==0:
-                    optimizer_CNN.param_groups[0]['lr'] =  optimizer_CNN.param_groups[0]['lr'] * 0.5
-                    if symbol:
-                        optimizer_FC.param_groups[0]['lr'] =  optimizer_FC.param_groups[0]['lr'] * 0.5
-            
-                if optimizer_CNN.param_groups[0]['lr'] < self.config.lr_threshold:
-                    optimizer_CNN.param_groups[0]['lr'] = self.config.lr_threshold
-                    if symbol:
-                        optimizer_FC.param_groups[0]['lr'] =  self.config.lr_threshold
-
-            
+            if epoch % self.config.lr_decay == 0 and epoch > 0:
+            # if epoch % self.config.lr_decay == 0:
+                for param_group in optimizer_CNN.param_groups:
+                    param_group['lr'] = max(param_group['lr'] * 0.5, self.config.lr_threshold)
