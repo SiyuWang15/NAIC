@@ -83,7 +83,7 @@ class Y2HRunner():
             FC.eval()
         
         denoiser = Denoise_Resnet18()
-        # denoiser.to(device)
+        denoiser.to(device)
         fp = f'/data/siyu/NAIC/workspace/denoiser/mode_{self.mode}_Pn_{self.Pn}/{self.config.train.denoiser_resume}/checkpoints/best.pth'
         denoiser.load_state_dict(torch.load(fp)['denoiser'])
         denoiser.eval()
@@ -106,7 +106,7 @@ class Y2HRunner():
                 Yd_list = []
                 for Y, Ylabel, Yp4fc, X, H_label in val_loader:
                     bs = Y.shape[0]
-                    dY = denoiser(Y).reshape(bs, 1, 8, 256).detach().numpy() # this is on cpu
+                    dY = denoiser(Y.to(device)).reshape(bs, 1, 8, 256).detach().cpu().numpy() # this is on cpu
                     denoise_mse = nn.MSELoss()(torch.Tensor(dY), Ylabel)
                     # print(f'denoise mse: {denoise_mse}')
                     Yp4cnn, Yd = extract(dY) # bsx2x2x256
@@ -156,7 +156,7 @@ class Y2HRunner():
 
             for it, (Y, Ylabel, Yp4fc, X, H_label) in enumerate(train_loader): # H_train: bsx2(real and imag)x4x32
                 bs = Yp4fc.shape[0]
-                dY = denoiser(Y).reshape(bs, 1, 8, 256).detach().numpy()
+                dY = denoiser(Y.to(device)).reshape(bs, 1, 8, 256).detach().cpu().numpy()
                 optimizer_CNN.zero_grad()
                 Yp4fc = Yp4fc.to(device)
                 Hf = FC(Yp4fc)
