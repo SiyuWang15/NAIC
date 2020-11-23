@@ -12,7 +12,7 @@ import time
 sys.path.append('..')
 from utils import *
 from func import SoftMLReceiver as MLReceiver
-from Estimators import CNN_Estimation, FC_ELU_Estimation, NMSELoss
+from Estimators import CNN_Estimation, FC_ELU_Estimation, NMSELoss, ResNet34
 from data import get_test_data, get_val_data
 
 
@@ -26,9 +26,14 @@ class FullRunner():
         self.FCconf = config.FC
     
     def get_model(self, device):
-        CNN = CNN_Estimation()
-        FC = FC_ELU_Estimation(self.FCconf.in_dim, self.FCconf.h_dim, self.FCconf.out_dim, self.FCconf.n_blocks)
         if self.config.model == 'cnn':
+            CNN = CNN_Estimation()
+        elif self.config.model == 'resnet34':
+            CNN = ResNet34()
+        else:
+            raise NotImplementedError
+        FC = FC_ELU_Estimation(self.FCconf.in_dim, self.FCconf.h_dim, self.FCconf.out_dim, self.FCconf.n_blocks)
+        if self.config.model in ['cnn', 'resnet34']:
             fp = os.path.join(f'/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_{self.mode}_Pn_{self.Pn}/CNN',\
              self.config.resume, 'checkpoints/best.pth')
         elif self.config.model == 'ema':
