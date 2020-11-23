@@ -114,30 +114,31 @@ class FullRunner():
         Y = get_test_data(self.Pn) # 10000x2x2x256
         bs = 500
         predXs = []
-        for i in range(int(len(Y) / bs)):
-            YY = Y[i*bs:(i+1)*bs, :]
-            Yp = YY[:, :, 0, :, :]
-            Yp4cnn = Yp.copy()
-            Yp = Yp.reshape(bs, 2*2*256)
-            Yd = YY[:, :, 1, :, :]
-            Hf = FC(torch.Tensor(Yp).to(device))
-            Hf = Hf.reshape(bs, 2, 4, 256)
-            if self.config.use_yp :
-                net_input = torch.cat([torch.Tensor(Yd).to(device), torch.Tensor(Yp4cnn).to(device), Hf], dim =2)
-            else:
-                net_input = torch.cat([torch.Tensor(Yd).to(device), Hf], dim=2)
-            Ht = CNN(net_input)
-            Ht = Ht.reshape(bs, 2, 4, 32).detach().cpu().numpy()
-            Ht = Ht[:, 0, :, :] + 1j*Ht[:, 1, :, :]
-            Hf_pred = np.fft.fft(Ht, 256) / 20.
-            Hf_pred = np.reshape(Hf_pred, [bs, 2, 2, 256], order = 'F')
-            Yd = Yd[:, 0, :, :] + 1j * Yd[:, 1, :, :]
-            _, predX = MLReceiver(Yd, Hf_pred)
-            predXs.append(predX)
-            logging.info(f'[{(i+1)*bs}]/[{len(Y)}] complete!')
-        predXs = np.concatenate(predXs, axis = 0)
-        predXs = np.array(np.floor(predXs+0.5), dtype = np.bool)
-        tag = 1 if self.Pn == 32 else 2
-        dp = os.path.join(self.config.log_dir, f'X_pre_{tag}.bin')
-        predXs.tofile(dp)
-        logging.info(f'Complete! Results saved at {dp}')
+        with torch.no_grad():
+            for i in range(int(len(Y) / bs)):
+                YY = Y[i*bs:(i+1)*bs, :]
+                Yp = YY[:, :, 0, :, :]
+                Yp4cnn = Yp.copy()
+                Yp = Yp.reshape(bs, 2*2*256)
+                Yd = YY[:, :, 1, :, :]
+                Hf = FC(torch.Tensor(Yp).to(device))
+                Hf = Hf.reshape(bs, 2, 4, 256)
+                if self.config.use_yp :
+                    net_input = torch.cat([torch.Tensor(Yd).to(device), torch.Tensor(Yp4cnn).to(device), Hf], dim =2)
+                else:
+                    net_input = torch.cat([torch.Tensor(Yd).to(device), Hf], dim=2)
+                Ht = CNN(net_input)
+                Ht = Ht.reshape(bs, 2, 4, 32).detach().cpu().numpy()
+                Ht = Ht[:, 0, :, :] + 1j*Ht[:, 1, :, :]
+                Hf_pred = np.fft.fft(Ht, 256) / 20.
+                Hf_pred = np.reshape(Hf_pred, [bs, 2, 2, 256], order = 'F')
+                Yd = Yd[:, 0, :, :] + 1j * Yd[:, 1, :, :]
+                _, predX = MLReceiver(Yd, Hf_pred)
+                predXs.append(predX)
+                logging.info(f'[{(i+1)*bs}]/[{len(Y)}] complete!')
+            predXs = np.concatenate(predXs, axis = 0)
+            predXs = np.array(np.floor(predXs+0.5), dtype = np.bool)
+            tag = 1 if self.Pn == 32 else 2
+            dp = os.path.join(self.config.log_dir, f'X_pre_{tag}.bin')
+            predXs.tofile(dp)
+            logging.info(f'Complete! Results saved at {dp}')
