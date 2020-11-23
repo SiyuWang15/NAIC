@@ -146,8 +146,16 @@ class Y2HRunner():
             FC.eval()
         
         best_nmse = 1000.
+        
+        for k, v in CNN.named_parameters():
+            if k == 'linear.weight' or k == 'linear.bias':
+                logging.info('do not freeze linear layer.')
+                v.requires_grad = True
+            else:
+                v.requires_grad = False
+
         criterion = NMSELoss()
-        optimizer_CNN = self.get_optimizer(CNN.parameters(), self.config.train.cnn_lr)
+        optimizer_CNN = self.get_optimizer(filter(lambda p: p.requires_grad,  CNN.parameters()), self.config.train.cnn_lr)
         symbol = not self.config.train.freeze_FC
         if symbol:
             optimizer_FC = self.get_optimizer(FC.parameters(), self.config.train.fc_lr)
