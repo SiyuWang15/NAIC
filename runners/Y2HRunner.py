@@ -7,7 +7,7 @@ import logging
 import os
 import sys
 sys.path.append('..')
-from Estimators import CNN_Estimation, FC_ELU_Estimation, NMSELoss, ResNet34, ResNet50, ResNet101
+from Estimators import CNN_Estimation, FC_ELU_Estimation, NMSELoss, ResNet34, ResNet50, ResNet101, Densenet
 from data import get_YH_data_random
 from utils import *
 
@@ -120,6 +120,9 @@ class Y2HRunner():
             CNN = ResNet50().to(device)
         elif self.config.cnnmodel == 'resnet101':
             CNN = nn.DataParallel(ResNet101()).to(device)
+        elif self.config.cnnmodel == 'densenet':
+            CNN = nn.DataParallel(Densenet()).to(device)
+            logging.info('This is densenet.')
         if not self.config.train.CNN_resume == 'None':
             fp = os.path.join(f'/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_{self.mode}_Pn_{self.Pn}/CNN', \
                 self.config.train.CNN_resume, 'checkpoints/best.pth')
