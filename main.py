@@ -6,7 +6,7 @@ from argparse import Namespace
 from utils import set_logger, seed_everything, get_config, arg_parser
 from multiprocessing import Pool
 
-from runners import Y2HRunner, FullRunner,  EMAY2HRunner
+from runners import Y2HRunner, FullRunner,  EMAY2HRunner, EnsembleRunner
 
 def run_y2h(args):
     config = get_config(f'./configs/y2h_config_{args.run_mode}.yml')
@@ -45,6 +45,18 @@ def run_full(args):
     runner = FullRunner(config)
     runner.run()
 
+def run_ensemble(args):
+    config = get_config('./configs/full_config.yml')
+    config.run_mode = args.runner
+    config.Pn = args.Pn
+    config.log_dir = os.path.join('workspace', config.run_mode, f'mode_{config.mode}_Pn_{config.Pn}', args.time)
+    os.makedirs(config.log_dir)
+    set_logger(config)
+    logging.info(config)
+    runner = EnsembleRunner(config)
+    runner.run()
+
+
 if __name__ == "__main__":
     parser = arg_parser()
     args = parser.parse_args()
@@ -56,3 +68,7 @@ if __name__ == "__main__":
         run_full(args)
     elif args.runner == 'ema':
         run_ema(args)
+    elif args.runner == 'evaluation':
+        run_evaludation(args)
+    elif args.runner == 'ensemble':
+        run_ensemble(args)
