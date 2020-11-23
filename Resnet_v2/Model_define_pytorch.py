@@ -4,8 +4,39 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset
 from collections import OrderedDict
+import math
+
+class SD_BiLSTM(nn.Module):
+    def __init__(self, input_num = 16, num_classes=1024):
+        super(SD_BiLSTM, self).__init__()
+
+        self.output_num = math.floor(num_classes / 256)
+        self.bilstm1 = torch.nn.LSTM(input_size = input_num,   hidden_size=input_num,   num_layers = 1, bidirectional= True)
+        self.bilstm2 = torch.nn.LSTM(input_size = 2*input_num, hidden_size=2*input_num, num_layers = 1, bidirectional= True)
+        self.bilstm3 = torch.nn.LSTM(input_size = 4*input_num, hidden_size=self.output_num, num_layers = 1, bidirectional= True)
+        # self.bilstm4 = torch.nn.LSTM(input_size = 8*input_num, hidden_size= self.output_num,   num_layers = 1, bidirectional= True)
+        # self.pool = torch.nn.AvgPool1d(kernel_size = 4, stride=4)
+        self.linear = nn.Linear(256*8, num_classes)
 
 
+
+    def forward(self, x):
+        self.bilstm1.flatten_parameters()
+        self.bilstm2.flatten_parameters()
+        self.bilstm3.flatten_parameters()
+        # self.bilstm4.flatten_parameters()
+
+        out,_ = self.bilstm1(x)
+        out,_ = self.bilstm2(out)
+        out,_ = self.bilstm3(out)
+        # out,_ = self.bilstm4(out)
+        out = out.permute(1,0,2).contiguous()
+        # out = self.pool(out)
+        # print(out.shape)
+        out = out.reshape(-1, 256*8)
+        out = self.linear(out)
+        # print(out.shape)
+        return torch.sigmoid(out)
 
 class conv_block(nn.Module):
     """
@@ -418,6 +449,48 @@ def ResNet101():
 def ResNet152():
     return ResNet(Bottleneck, [3,8,36,3])
 
+
+class XDH2H_Resnet(nn.Module):
+    def __init__(self, block=BasicBlock, num_blocks=[2,2,2,2], num_classes=256):
+        super(XDH2H_Resnet, self).__init__()
+        self.in_planes = 64
+
+        self.conv1 = nn.Conv2d(2, 64, kernel_size=3,
+                       stride=1, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(64)
+        
+        self.layer1 = self._make_layer(block, 64, num_blocks[0], stride=1)
+        self.layer2 = self._make_layer(block, 128, num_blocks[1], stride=2)
+        self.layer3 = self._make_layer(block, 256, num_blocks[2], stride=2)
+        self.layer4 = self._make_layer(block, 512, num_blocks[3], stride=2)
+        # self.linear = nn.Linear(512*4*6, num_classes)
+        self.linear = nn.Linear(512*1*32, num_classes)
+
+    def _make_layer(self, block, planes, num_blocks, stride):
+        strides = [stride] + [1]*(num_blocks-1)
+        layers = []
+        for stride in strides:
+            layers.append(block(self.in_planes, planes, stride))
+            self.in_planes = planes * block.expansion
+        return nn.Sequential(*layers)
+
+    def forward(self, x):
+        out = F.relu(self.bn1(self.conv1(x)))
+        # print(out.shape)
+        out = self.layer1(out)
+        # print(out.shape)
+        out = self.layer2(out)
+        # print(out.shape)
+        out = self.layer3(out)
+        # print(out.shape)
+        out = self.layer4(out)
+        # print(out.shape)
+        # out = F.avg_pool2d(out, 4)
+        out = out.view(out.size(0), -1)
+        out = self.linear(out)
+        return out
+
+
 class XYH2X_ResNet(nn.Module):
     def __init__(self, block=BasicBlock, num_blocks=[2,2,2,2], num_classes=1024):
         super(XYH2X_ResNet, self).__init__()
@@ -622,13 +695,18 @@ if __name__ == '__main__':
 
     # print('Lovelive')
 
-    x = np.random.randn(3,2,1,256) + 1j*np.random.randn(3,2,1,256)
-    H = np.random.randn(3,2,2,256) + 1j*np.random.randn(3,2,2,256)
-    y = np.zeros([3,2,1,256], dtype = np.complex64)
-    for idx1 in range(3):
-        for idx2 in range(256):   
-            y[idx1, :,:, idx2] = H[idx1,:,:,idx2].dot(x[idx1,:,:,idx2])
-    y = y.reshape(3,2,256)
-    x_hat = equalization(H, y)
+    # x = np.random.randn(3,2,1,256) + 1j*np.random.randn(3,2,1,256)
+    # H = np.random.randn(3,2,2,256) + 1j*np.random.randn(3,2,2,256)
+    # y = np.zeros([3,2,1,256], dtype = np.complex64)
+    # for idx1 in range(3):
+    #     for idx2 in range(256):   
+    #         y[idx1, :,:, idx2] = H[idx1,:,:,idx2].dot(x[idx1,:,:,idx2])
+    # y = y.reshape(3,2,256)
+    # x_hat = equalization(H, y)
 
+    x = torch.randn(10,2,8,256)
+    model = XDH2H_Resnet()
+    out = model(x)
+    # out = model(x)
+    
     print('lovelive')
