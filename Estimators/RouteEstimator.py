@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from .densenet import densenet121
 import torch.nn.functional as F
 # from .resnet import *
 
@@ -230,3 +231,11 @@ def ResNet101():
 
 def ResNet152():
     return ResNet(Bottleneck, [3,8,36,3])
+
+class Densenet(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.model = densenet121()
+    
+    def forward(self, x):
+        return self.model(x)
