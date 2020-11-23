@@ -196,7 +196,7 @@ class ResNet(nn.Module):
         super(ResNet, self).__init__()
         self.in_planes = 64
 
-        self.conv1 = nn.Conv2d(2, 64, kernel_size=3,
+        self.conv1 = nn.Conv2d(1, 64, kernel_size=3,
                        stride=1, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(64)
         
@@ -204,7 +204,8 @@ class ResNet(nn.Module):
         self.layer2 = self._make_layer(block, 128, num_blocks[1], stride=2)
         self.layer3 = self._make_layer(block, 256, num_blocks[2], stride=2)
         self.layer4 = self._make_layer(block, 512, num_blocks[3], stride=2)
-        self.linear = nn.Linear(512*4*6, num_classes)
+        # self.linear = nn.Linear(512*4*6, num_classes)
+        self.linear = nn.Linear(512*2*32, num_classes)
 
     def _make_layer(self, block, planes, num_blocks, stride):
         strides = [stride] + [1]*(num_blocks-1)
@@ -232,7 +233,20 @@ class ResNet(nn.Module):
         return out
 
 
+def ResNet18():
+    return ResNet(BasicBlock, [2,2,2,2])
 
+def ResNet34():
+    return ResNet(BasicBlock, [3,4,6,3])
+
+def ResNet50():
+    return ResNet(Bottleneck, [3,4,6,3])
+
+def ResNet101():
+    return ResNet(Bottleneck, [3,4,23,3])
+
+def ResNet152():
+    return ResNet(Bottleneck, [3,8,36,3])
 
 
 class FC_Detection(nn.Module):
@@ -386,9 +400,9 @@ class DatasetFolder(Dataset):
 
 if __name__ == '__main__':
 
-    input = torch.randn(256, 2, 6*8, 32).cuda()
-    # model = ResNet().cuda()
-    model = U_Net().cuda()
+    input = torch.randn(256, 1, 12, 256).cuda()
+    model = ResNet18().cuda()
+    # model = U_Net().cuda()
 
     output = model(input)
 

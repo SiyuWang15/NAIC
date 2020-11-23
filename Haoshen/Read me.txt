@@ -1,0 +1,3 @@
+一个CNN 网络8导频训练 h+x
+
+data.cuda()

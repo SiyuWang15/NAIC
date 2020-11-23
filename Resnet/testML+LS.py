@@ -8,7 +8,8 @@ from scipy.io import loadmat
 from scipy.io import savemat
 
 
-from MLreceiver import MLReceiver, MakeCodebook
+from MLreceiver import MLReceiver
+from LSreveiver import LSequalization
 from generate_data import generatorXY
 
 # Parameters for training
@@ -27,7 +28,7 @@ H_val = H2[:,1,:,:]+1j*H2[:,0,:,:]
 
 Pilot_num = 8
 batch_num = 2000
-SNRdb = 100
+SNRdb = 10
 mode = 0
 # 生成测试数据 Y：-1*2048； X：-1*1024； H：-1*4*32 时域信道
 Y, X, H = generatorXY(batch_num,H_val,Pilot_num, SNR=SNRdb, m=mode)
@@ -48,43 +49,22 @@ Yp = Yp[:,0,:,:] + 1j*Yp[:,1,:,:]
 Yd = Y[:,:,1,:,:]
 Yd = Yd[:,0,:,:] + 1j*Yd[:,1,:,:]
 
-# 生成码本
-G = 4
-codebook = MakeCodebook(G)
+#### 基于ML恢复发送比特流X ####
+X_LS = LSequalization(Hf, Yd)
 
 #### 基于ML恢复发送比特流X ####
+X_ML2, X_bits2 = MLReceiver(Yd,Hf)
 
 
-X_ML2, X_bits2 = MLReceiver(Yd,Hf,codebook)
-K = 256
-P = Pilot_num * 2
-pilotCarriers = np.arange(0, K, K // P)
-pilotCarriers1 = pilotCarriers[0:P:2]
-pilotCarriers2 = pilotCarriers[1:P:2]
 
-X_p1 = X_ML2[:,0, pilotCarriers1]
-X_p2 = X_ML2[:,1, pilotCarriers2]
-# 可用的复数input：样本数 * 发射天线数 * 子载波数
-X1 = np.reshape(X, (-1, 2, 512))
-input = np.zeros((batch_num, 2,256), dtype=complex)
-for num in range(batch_num):
-    for idx in range(2):
-        bits = X1[num, idx, :]
-        # 与 utils文件里的modulation一模一样的操作
-        bits = np.reshape(bits, (256,2))
-        input[num, idx,:] = 0.7071 * (2 * bits[:, 0] - 1) + 0.7071j * (2 * bits[:, 1] - 1)
+error2 = X_bits2 - X
+bit_error2 = np.sum(np.sum(np.abs(error2)<0.1))/ error2.size
+print(bit_error2)
 
-# error1 = X_ML1 - input
-# bit_error1 = np.sum(np.sum(np.abs(error1)<0.1))/ error1.size
-# print(bit_error1)
 
-# error1 = X_bits1 - X
-# bit_error1 = np.sum(np.sum(np.abs(error1)<0.1))/ error1.size
-# print(bit_error1)
 
-# error2 = X_ML2 - input
-# bit_error2 = np.sum(np.sum(np.abs(error2)<0.1))/ error2.size
-# print(bit_error2)
+
+
 
 error2 = X_bits2 - X
 bit_error2 = np.sum(np.sum(np.abs(error2)<0.1))/ error2.size

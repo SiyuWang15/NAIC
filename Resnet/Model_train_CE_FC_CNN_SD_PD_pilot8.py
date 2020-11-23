@@ -88,7 +88,7 @@ elif args.model == 'Resnet50':
     SD = ResNet50()
 else:
     SD = U_Net()
-SD = torch.nn.DataParallel( SD ).cuda()  # model.module
+
 if args.load_SD:
     if 'Resnet' in args.model:
         SD_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/PD_' + args.model + '_SD_mode'+str(mode)+'.pth.tar'
@@ -96,7 +96,7 @@ if args.load_SD:
         SD_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/PD_Unet_SD_mode'+str(mode)+'.pth.tar' 
     SD.load_state_dict(torch.load(SD_path)['state_dict'])
     print("Weight For SD PD Loaded!")
-
+SD = torch.nn.DataParallel( SD ).cuda()  # model.module
 
 
 if args.freeze_CE == 1:
@@ -291,24 +291,16 @@ for epoch in range(epochs):
                     SDSave = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/PD_' + args.model + '_SD_mode'+str(mode)+'_Pilot'+str(Pilot_num)+'.pth.tar'
                 else:
                     SDSave =  '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/PD_Unet_SD_mode'+str(mode)+'_Pilot'+str(Pilot_num)+'.pth.tar'                     
-                try:
-                    torch.save({'state_dict': SD.state_dict(), }, SDSave, _use_new_zipfile_serialization=False)
-                except:
-                    torch.save({'state_dict': SD.module.state_dict(), }, SDSave,_use_new_zipfile_serialization=False)
+                torch.save({'state_dict': SD.module.state_dict(), }, SDSave,_use_new_zipfile_serialization=False)
                 print('SD Model saved!')
                 
                 if args.freeze_CE == 0:
                     FCSave =  '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/FC_CE_Pilot'+ str(Pilot_num)+'_mode' + str(mode) + '.pth.tar'
-                    try:
-                        torch.save({'state_dict': FC.state_dict(), }, FCSave, _use_new_zipfile_serialization=False)
-                    except:
-                        torch.save({'state_dict': FC.module.state_dict(), }, FCSave, _use_new_zipfile_serialization=False)
+                    torch.save({'state_dict': FC.module.state_dict(), }, FCSave, _use_new_zipfile_serialization=False)
                     
                     CNNSave =  '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/Resnet18_CE_Pilot'+ str(Pilot_num)+'_mode' + str(mode) + '.pth.tar'
-                    try:
-                        torch.save({'state_dict': FC.state_dict(), }, FCSave, _use_new_zipfile_serialization=False)
-                    except:
-                        torch.save({'state_dict': FC.module.state_dict(), }, FCSave, _use_new_zipfile_serialization=False)         
+
+                    torch.save({'state_dict': CNN.module.state_dict(), }, FCSave, _use_new_zipfile_serialization=False)         
                     
                     
                     print('CE Model saved!')

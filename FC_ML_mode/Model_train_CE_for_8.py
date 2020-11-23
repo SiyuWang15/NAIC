@@ -18,11 +18,15 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--load_flag', type = bool, default = False)
 parser.add_argument('--gpu_list',  type = str,  default='4,5,6,7', help='input gpu list')
 parser.add_argument('--mode',  type = int,  default= 0, help='input mode')
+parser.add_argument( )
 args = parser.parse_args()
 
 
 # Parameters for training
 gpu_list = args.gpu_list
+load_flag = args.load_flag
+learning_rate = 2e-3  # bigger to train faster
+
 os.environ["CUDA_VISIBLE_DEVICES"] = gpu_list
 
 def seed_everything(seed=42):
@@ -38,7 +42,7 @@ seed_everything(SEED)
 
 batch_size = 256
 epochs = 500
-learning_rate = 2e-3  # bigger to train faster
+
 lr_threshold = 1e-5
 lr_freq = 10
 
@@ -49,7 +53,7 @@ iterations = 10000
 Pilotnum = 8
 mode = args.mode # 0,1,2,-1
 SNRdB = -1
-load_flag = args.load_flag
+
 best_loss = 100
 
 # channel data for training and validation

@@ -237,18 +237,14 @@ for epoch in range(epochs):
             print('NMSE %.4f' % loss)
             if loss < best_loss:
                 CNNSave =  '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/'+ str(args.model)+'_CE_Pilot'+ str(Pilot_num)+'_mode' + str(mode) + '.pth.tar'
-                try:
-                    torch.save({'state_dict': CNN.state_dict(), }, CNNSave, _use_new_zipfile_serialization=False)
-                except:
-                    torch.save({'state_dict': CNN.module.state_dict(), }, CNNSave,  _use_new_zipfile_serialization=False)
+
+                torch.save({'state_dict': CNN.module.state_dict(), }, CNNSave,  _use_new_zipfile_serialization=False)
                 print('CNN Model saved!')
 
                 if args.freeze_FC == 0:
                     FCSave =  '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/FC_CE_Pilot'+ str(Pilot_num)+'_mode' + str(mode) + '.pth.tar'
-                    try:
-                        torch.save({'state_dict': FC.state_dict(), }, FCSave, _use_new_zipfile_serialization=False)
-                    except:
-                        torch.save({'state_dict': FC.module.state_dict(), }, FCSave, _use_new_zipfile_serialization=False)
+ 
+                    torch.save({'state_dict': FC.module.state_dict(), }, FCSave, _use_new_zipfile_serialization=False)
                     print('FC Model saved!')
                 best_loss = loss
 
