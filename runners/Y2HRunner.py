@@ -200,8 +200,13 @@ class Y2HRunner():
             param.requires_grad = False
         logging.info('freeze CE2.')
 
+        FC = nn.DataParallel(FC).to(device)
+        CNN = nn.DataParallel(CNN).to(device)
+        SD = nn.DataParallel(SD).to(device)
+        CE2 = nn.DataParallel(CE2).to(device)
+        CE3 = nn.DataParallel(CE3).to(device)
 
-        optimizer_CE3 = self.get_optimizer(CE3.parameters(), lr = 0.0001)
+        optimizer_CE3 = self.get_optimizer(CE3.module.parameters(), lr = 0.0001)
         CE3.train()
 
         criterion = NMSELoss()
