@@ -27,7 +27,7 @@ H2 = np.reshape(H2,[2000,2,4,32])
 H_val = H2[:,1,:,:]+1j*H2[:,0,:,:]
 
 Pilot_num = 8
-batch_num = 2000
+batch_num = 200
 SNRdb = 10
 mode = 0
 # 生成测试数据 Y：-1*2048； X：-1*1024； H：-1*4*32 时域信道
@@ -62,13 +62,16 @@ bit_error2 = np.sum(np.sum(np.abs(error2)<0.1))/ error2.size
 print(bit_error2)
 
 
+X_test = np.zeros([200, 2, 2,256], dtype=np.float32)
+X_test[:,0,:,:] = X_ML2.real
+X_test[:,1,:,:] = X_ML2.imag
+
+X_test = (X_test > 0)*1.
 
 
-
-
-error2 = X_bits2 - X
-bit_error2 = np.sum(np.sum(np.abs(error2)<0.1))/ error2.size
-print(bit_error2)
+X_test_bit = X_bits2.reshape([200,2,256,2])
+X_test_bit = X_test_bit.transpose(0,3,1,2)
+error2 = X_test_bit - X_test
 
 # X_1 = np.array(np.floor(X_bits + 0.5), dtype=np.bool)
 # X_1.tofile('./X_1.bin')

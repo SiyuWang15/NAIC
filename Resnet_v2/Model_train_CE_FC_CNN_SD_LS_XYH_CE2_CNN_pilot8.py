@@ -59,7 +59,7 @@ batch_size = 256
 epochs = 300
 
 lr_threshold = 1e-6
-lr_freq = 15
+lr_freq = 10
 num_workers = 16
 print_freq = 100
 Pilot_num = 8
@@ -94,18 +94,18 @@ if args.load_CE:
     FC.load_state_dict(state_dicts['fc'])
     CNN.load_state_dict(state_dicts['cnn'])
     print("Model for CE has been loaded!")
-# FC = torch.nn.DataParallel( FC ).cuda()  # model.module
-# CNN = torch.nn.DataParallel( CNN ).cuda()  # model.module
-FC = FC.cuda()
-CNN = CNN.cuda()
+FC = torch.nn.DataParallel( FC ).cuda()  # model.module
+CNN = torch.nn.DataParallel( CNN ).cuda()  # model.module
+# FC = FC.cuda()
+# CNN = CNN.cuda()
 
 SD = XYH2X_ResNet18()
 if args.load_SD:
     SD_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/XYH2X_Resnet18_SD_mode'+str(mode)+'_Pilot'+str(Pilot_num)+'.pth.tar'                
     SD.load_state_dict(torch.load(SD_path)['state_dict'])
     print("Weight For SD PD Loaded!")
-# SD = torch.nn.DataParallel( SD ).cuda()  # model.module
-SD = SD.cuda()
+SD = torch.nn.DataParallel( SD ).cuda()  # model.module
+# SD = SD.cuda()
 
 
 CE2 = XDH2H_Resnet()
@@ -209,12 +209,17 @@ for epoch in range(epochs):
         output2 = CNN(input2)
 
         #第三层网络输入预处理
+        '''
+        输入时域信道，输出频域信道
+        '''
         H_train_padding = output2.reshape(batch_size, 2, 4, 32)
         H_train_padding = torch.cat([H_train_padding, torch.zeros(batch_size,2,4,256-32, requires_grad=True).cuda()],3)
         H_train_padding = H_train_padding.permute(0,2,3,1)
         H_train_padding = torch.fft(H_train_padding, 1)/20
         H_train_padding = H_train_padding.permute(0,3,1,2).contiguous() #df1为对应的频域形式，维度为Batch*2*4*256
-
+        '''
+        以上
+        '''
 
         # ML 初步估计
         X_LS = get_LS(Yd_input_train, H_train_padding.detach().cpu())
@@ -222,18 +227,20 @@ for epoch in range(epochs):
         X_input_train = torch.zeros([batch_size, 2, 2, 256], dtype = torch.float32)
         X_input_train[:,0,:,:] = torch.tensor(X_LS.real, dtype = torch.float32)
         X_input_train[:,1,:,:] = torch.tensor(X_LS.imag, dtype = torch.float32)
-        '''
+        
         input3 = torch.cat([X_input_train.cuda(), Yp_input_train.cuda(), Yd_input_train.cuda(), H_train_padding], 2)
 
         # 第三层网络的输出
         output3 = SD(input3)
 
-        X_refine_train = ((output3 > 0.5)*2. - 1)/np.sqrt(2)
-        '''
+        # X_refine_train = ((output3 > 0.5)*2. - 1)/np.sqrt(2)
+    
         # 第四层网络输入, X,Yd,H_train_padding
+        output3 = output3.reshape([batch_size,2,256,2])
+        output3 = output3.permute(0,3,1,2).contiguous()
 
-        input4 = torch.cat([X_input_train.cuda(), Yd_input_train.cuda(), H_train_padding], 2)
-
+        # input4 = torch.cat([X_input_train.cuda(), Yd_input_train.cuda(), H_train_padding], 2)
+        input4 = torch.cat([output3.cuda(), Yd_input_train.cuda(), H_train_padding], 2)
         output4 = CE2(input4)
         output4 = output4.reshape(batch_size, 2, 4, 32)
         # 计算loss
@@ -256,16 +263,20 @@ for epoch in range(epochs):
 
     if epoch >0:
         if epoch % lr_freq ==0:
-            optimizer_SD.param_groups[0]['lr'] =  optimizer_SD.param_groups[0]['lr'] * 0.5
+            optimizer_CE2.param_groups[0]['lr'] =  optimizer_CE2.param_groups[0]['lr'] * 0.5
             if args.freeze_CE == 0:
                 optimizer_FC.param_groups[0]['lr'] =  optimizer_FC.param_groups[0]['lr'] * 0.5
                 optimizer_CNN.param_groups[0]['lr'] =  optimizer_CNN.param_groups[0]['lr'] * 0.5
+            if args.freeze_SD == 0:
+                optimizer_SD.param_groups[0]['lr'] =  optimizer_SD.param_groups[0]['lr'] * 0.5
 
-        if optimizer_SD.param_groups[0]['lr'] < lr_threshold:
-            optimizer_SD.param_groups[0]['lr'] = lr_threshold
+        if optimizer_CE2.param_groups[0]['lr'] < lr_threshold:
+            optimizer_CE2.param_groups[0]['lr'] = lr_threshold
             if args.freeze_CE == 0:
                 optimizer_FC.param_groups[0]['lr'] =  lr_threshold
                 optimizer_CNN.param_groups[0]['lr'] =  lr_threshold
+            if args.freeze_SD == 0:
+                optimizer_SD.param_groups[0]['lr'] =  lr_threshold
 
 
     SD.eval()
@@ -327,17 +338,19 @@ for epoch in range(epochs):
             X_input_test[:,1,:,:] = torch.tensor(X_LS.imag, dtype = torch.float32)
  
 
-            '''
+            
             input3 = torch.cat([X_input_test.cuda(), Yp_input_test.cuda(), Yd_input_test.cuda(), H_test_padding], 2)
 
             # 第三层网络的输出
             output3 = SD(input3)
 
-            X_refine_test = ((output3 > 0.5)*2. - 1)/np.sqrt(2)
-            '''
-            # 第四层网络输入, X,Yd,H_test_padding
+            # X_refine_test = ((output3 > 0.5)*2. - 1)/np.sqrt(2)
+            
+            output3 = output3.reshape([Ns,2,256,2])
+            output3 = output3.permute(0,3,1,2).contiguous()
 
-            input4 = torch.cat([X_input_test.cuda(), Yd_input_test.cuda(), H_test_padding], 2)
+            # input4 = torch.cat([X_input_test.cuda(), Yd_input_test.cuda(), H_test_padding], 2)
+            input4 = torch.cat([output3.cuda(), Yd_input_test.cuda(), H_test_padding], 2)
 
             output4 = CE2(input4)
             output4 = output4.reshape(Ns, 2, 4, 32)
