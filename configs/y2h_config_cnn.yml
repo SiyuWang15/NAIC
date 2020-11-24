@@ -1,5 +1,5 @@
 mode: 0
-Pn: 8
+Pn: 32
 model: cnn
 cnnmodel: base
 use_yp: True
@@ -11,10 +11,10 @@ lr_threshold: 0.00001
 train:
   cnn_lr: 0.00003
   fc_lr: 0.0001
-  train_batch_size: 800 # 256 for resnet34, 512 for base
+  train_batch_size: 400 # 256 for resnet34, 512 for base
   val_batch_size: 1000
   FC_resume: None # 1118-15-33-37 for Pn 32 1118-00-36-40 for Pn 8
-  CNN_resume: 1122-02-00-34 #1118-16-48-49 # 1118-01-07-26
+  CNN_resume: 1123-21-37-27 #1118-16-48-49 # 1118-01-07-26
   freeze_FC: True
   optimizer: adam
 FC:

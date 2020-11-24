@@ -144,6 +144,7 @@ class Y2HRunner():
             CNN = CNN_Estimation().to(device)
         elif self.config.cnnmodel == 'resnet34':
             CNN = ResNet34().to(device)
+            logging.info("Resnet34.")
         elif self.config.cnnmodel == 'resnet50':
             CNN = ResNet50().to(device)
         elif self.config.cnnmodel == 'resnet101':
@@ -189,10 +190,10 @@ class Y2HRunner():
         logging.info(f'load state dict of SD and do not freeze it.')
 
         CE2 = XDH2H_Resnet()
-        CE2 = nn.DataParallel(CE2)
-        # fp = '/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_0_Pn_8/mingyao/Best_XDH2H_Resnet34_SD_mode0_Pilot8.pth.tar'
-        fp = '/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1124-20-06-13/checkpoints/best.pth'
-        CE2.load_state_dict(torch.load(fp)['CE2'])
+        # CE2 = nn.DataParallel(CE2)
+        fp = '/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_0_Pn_8/mingyao/Best_XDH2H_Resnet34_SD_mode0_Pilot8.pth.tar'
+        # fp = '/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1124-20-06-13/checkpoints/best.pth'
+        CE2.load_state_dict(torch.load(fp)['state_dict'])
         CE2.to(device)
         # CE3 = copy.deepcopy(CE2)
         # CE2.eval()
@@ -204,6 +205,7 @@ class Y2HRunner():
 
         FC = nn.DataParallel(FC).to(device)
         SD = nn.DataParallel(SD).to(device)
+        CNN = nn.DataParallel(CNN).to(device)
         FC.eval()
         CNN.eval()
 
