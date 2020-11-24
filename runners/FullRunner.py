@@ -38,7 +38,7 @@ class FullRunner():
              self.config.resume, 'checkpoints/best.pth')
         elif self.config.model == 'ema':
             fp = os.path.join(f'/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_{self.mode}_Pn_{self.Pn}/EMA',\
-             self.config.resume, 'checkpoints/best_ema.pth')
+             self.config.resume, 'checkpoints/best.pth')
 
         shutil.copy(fp, os.path.join(self.config.log_dir, 'best.pth'))
 

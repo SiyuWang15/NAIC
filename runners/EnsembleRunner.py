@@ -37,8 +37,10 @@ class EnsembleRunner():
     def run(self):
         models = self.get_model()
         X_jh = np.load('/data/siyu/NAIC/dataset/X_jh.npy', allow_pickle=True)[:self.N]
+        X_cmy = np.fromfile('/data/siyu/NAIC/dataset/X_cmy.bin', dtype = np.bool).astype(np.float).reshape(10000, 1024)[:self.N]
         
         logging.info(f'model jianghao || acc : {(X_jh == self.X).mean()}')
+        logging.info(f'model mingyao || acc: {(X_cmy == self.X).mean()}')
         batch_sizes = [500]*10
         X_collect = []
         Ht_collect = []
@@ -48,11 +50,13 @@ class EnsembleRunner():
             Ht_collect.append(predh)
             logging.info(f'model {self.modelnames[i]} || acc: {acc:.7f} || nmse: {nmse:.5f}')
         X_collect.append(X_jh)
+        X_collect.append(X_cmy)
         X_collect = np.stack(X_collect, axis=0)
         # Ht_collect = np.stack(Ht_collect, axis=0)
         tag = 1 if self.Pn == 32 else 2
         # np.save(os.path.join(self.config.log_dir, f'X_pre_{tag}.npy'), X_collect)
-        thre = int((len(self.modelnames) + 1)/2)
+        thre = int((len(self.modelnames) + 2)/2)
+        logging.info(thre)
         predx = (X_collect.sum(axis = 0) > thre)
         X_collect = np.concatenate([X_collect, np.expand_dims(predx, axis = 0)], axis = 0)
         acc = (predx == self.X).mean()
@@ -63,6 +67,7 @@ class EnsembleRunner():
     def similarity(self, x):
         modelnames = self.modelnames
         modelnames.append('jianghao')
+        modelnames.append('mingyao')
         info = []
         for i in range(-1, len(modelnames)):
             if i == -1:
@@ -80,7 +85,8 @@ class EnsembleRunner():
             f.write(s + '\n')
 
     def get_model(self):
-        modelnames = ['resnet18', 'resnet34']
+        # modelnames = ['resnet18', 'resnet34']
+        modelnames = ['resnet34']
         # modelnames = ['resnet18', 'resnet18']
         use_fc = [1]*10
         # ckpts = [
@@ -102,7 +108,7 @@ class EnsembleRunner():
         #     'workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1122-02-00-34/checkpoints/best.pth'
         # ]
         ckpts = [
-            '/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_0_Pn_8/EMA/1121-15-28-33/checkpoints/best.pth', 
+            # '/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_0_Pn_8/EMA/1121-15-28-33/checkpoints/best.pth', 
             '/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1122-20-57-33/checkpoints/best.pth'
         ]
         models = []
