@@ -31,6 +31,8 @@ class EMAY2HRunner():
             CNN = CNN_Estimation().to(device)
         elif self.config.cnnmodel == 'resnet34':
             CNN = ResNet34().to(device)
+        elif self.config.cnnmodel == 'densenet':
+            CNN = nn.DataParallel(Densenet()).to(device)
         else:
             raise NotImplementedError(f'model {self.config.cnnmodel} not implememted!')
         if not self.config.train.CNN_resume == 'None':
