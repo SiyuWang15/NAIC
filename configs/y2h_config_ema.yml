@@ -12,10 +12,10 @@ ema_decay: 0.999
 train:
   cnn_lr: 0.0003
   fc_lr: 0.0001
-  train_batch_size: 512 # 256 for resnet34, 512 for base
+  train_batch_size: 300 # 256 for resnet34, 512 for base
   val_batch_size: 1000
-  FC_resume: finetune # 1118-15-33-37 for Pn 32 1118-00-36-40 for Pn 8
-  CNN_resume: 1119-14-38-57 # finetune # 1118-16-48-49 # 1118-01-07-26
+  FC_resume: None # 1118-15-33-37 for Pn 32 1118-00-36-40 for Pn 8
+  CNN_resume: 1123-17-59-56 # finetune # 1118-16-48-49 # 1118-01-07-26
   freeze_FC: True
   optimizer: adam
 FC:

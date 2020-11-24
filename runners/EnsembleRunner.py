@@ -52,7 +52,9 @@ class EnsembleRunner():
         # Ht_collect = np.stack(Ht_collect, axis=0)
         tag = 1 if self.Pn == 32 else 2
         # np.save(os.path.join(self.config.log_dir, f'X_pre_{tag}.npy'), X_collect)
-        predx = (X_collect.sum(axis = 0) > 2)
+        thresh = int((len(self.modelnames) + 1) / 2)
+        print(thresh)
+        predx = (X_collect.sum(axis = 0) > thresh)
         X_collect = np.concatenate([X_collect, np.expand_dims(predx, axis = 0)], axis = 0)
         # acc = (predx == self.X).mean()
         logging.info(f'Final accuracy: {acc}')
@@ -62,6 +64,7 @@ class EnsembleRunner():
     def similarity(self, x):
         modelnames = self.modelnames
         modelnames.append('jianghao')
+        modelnames.append('final')
         info = []
         for i in range(-1, len(modelnames)):
             if i == -1:
@@ -79,7 +82,7 @@ class EnsembleRunner():
             f.write(s + '\n')
 
     def get_model(self):
-        modelnames = ['resnet18'] * 10
+        modelnames = ['resnet18'] * 2
         # modelnames = ['resnet18', 'resnet18']
         use_fc = [1]*10
         # ckpts = [
@@ -89,16 +92,16 @@ class EnsembleRunner():
         #     '/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_0_Pn_8/EMA/1122-21-06-48/checkpoints/best_ema.pth'
         # ]
         ckpts = [
-            'workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1123-21-43-21/checkpoints/epoch50.pth',
-            'workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1123-21-43-21/checkpoints/epoch30.pth',
-            'workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1122-02-00-34/checkpoints/epoch290.pth',
-            'workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1122-02-00-34/checkpoints/epoch280.pth',
-            'workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1122-02-00-34/checkpoints/epoch270.pth',
-            'workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1120-14-53-06/checkpoints/epoch280.pth',
-            'workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1120-14-53-06/checkpoints/best.pth',
+            # 'workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1123-21-43-21/checkpoints/epoch50.pth',
+            # 'workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1123-21-43-21/checkpoints/epoch30.pth',
+            # 'workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1122-02-00-34/checkpoints/epoch290.pth',
+            # 'workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1122-02-00-34/checkpoints/epoch280.pth',
+            # 'workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1122-02-00-34/checkpoints/epoch270.pth',
+            'workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1120-14-53-06/checkpoints/epoch280.pth', # r
+            # 'workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1120-14-53-06/checkpoints/best.pth',
             'workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1122-02-00-34/checkpoints/best.pth',
-            'workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1123-21-43-21/checkpoints/best.pth',
-            'workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1122-02-00-34/checkpoints/best.pth'
+            # 'workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1123-21-43-21/checkpoints/best.pth',
+            # 'workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1122-02-00-34/checkpoints/best.pth'
         ]
         models = []
         for i in range(len(modelnames)):
