@@ -25,11 +25,11 @@ class EnsembleRunner():
         self.mode = config.mode
         self.FCconf = config.FC
         self.device = 'cuda'
+        self.N = 4000
         self.get_data()
-        self.N = 2000
     
     def get_data(self):
-        N = 2000
+        N = self.N
         D = np.load('/data/siyu/NAIC/dataset/evaluation.npy', allow_pickle = True).item()
         self.X, self.Y, self.H = D['x'], D['y'], D['h'] # numpy Nx1024, Nxx2x2x2x256, Nx2x4x32
         self.X, self.Y, self.H = self.X[:N], self.Y[:N], self.H[:N]
@@ -39,7 +39,7 @@ class EnsembleRunner():
         X_jh = np.load('/data/siyu/NAIC/dataset/X_jh.npy', allow_pickle=True)[:self.N]
         
         logging.info(f'model jianghao || acc : {(X_jh == self.X).mean()}')
-        batch_sizes = [500, 500, 500, 500]
+        batch_sizes = [500]*10
         X_collect = []
         Ht_collect = []
         for i, model in enumerate(models):
@@ -79,14 +79,26 @@ class EnsembleRunner():
             f.write(s + '\n')
 
     def get_model(self):
-        modelnames = ['densenet', 'resnet34', 'resnet18', 'resnet18']
+        modelnames = ['resnet18'] * 10
         # modelnames = ['resnet18', 'resnet18']
-        use_fc = [1, 1, 1, 1]
+        use_fc = [1]*10
+        # ckpts = [
+        #     # '/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1123-14-42-37/checkpoints/best.pth',
+        #     '/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1122-20-57-33/checkpoints/best.pth',
+        #     '/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1122-02-00-34/checkpoints/best.pth',
+        #     '/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_0_Pn_8/EMA/1122-21-06-48/checkpoints/best_ema.pth'
+        # ]
         ckpts = [
-            # '/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1123-14-42-37/checkpoints/best.pth',
-            '/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1122-20-57-33/checkpoints/best.pth',
-            '/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1122-02-00-34/checkpoints/best.pth',
-            '/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_0_Pn_8/EMA/1122-21-06-48/checkpoints/best_ema.pth'
+            'workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1123-21-43-21/checkpoints/epoch50.pth',
+            'workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1123-21-43-21/checkpoints/epoch30.pth',
+            'workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1122-02-00-34/checkpoints/epoch290.pth',
+            'workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1122-02-00-34/checkpoints/epoch280.pth',
+            'workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1122-02-00-34/checkpoints/epoch270.pth',
+            'workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1120-14-53-06/checkpoints/epoch280.pth',
+            'workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1120-14-53-06/checkpoints/best.pth',
+            'workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1122-02-00-34/checkpoints/best.pth',
+            'workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1123-21-43-21/checkpoints/best.pth',
+            'workspace/ResnetY2HEstimator/mode_0_Pn_8/CNN/1122-02-00-34/checkpoints/best.pth'
         ]
         models = []
         for i in range(len(modelnames)):

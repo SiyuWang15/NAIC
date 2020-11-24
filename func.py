@@ -100,7 +100,7 @@ def SoftMLReceiver_single_process(q, label, Y, H, SNRdb = 10):
     q[label] = (X_ML, X_bits)
     # print('P{0} completed!'.format(label))
 
-def SoftMLReceiver(Y, H, Codebook = MakeCodebook(4), SNRdb = 8., num_workers = 16):
+def SoftMLReceiver(Y, H, Codebook = MakeCodebook(4), SNRdb = 7., num_workers = 16):
     # 输入：
     # Y : frequency domain 复数 (batch * 2 * 256) [样本数 * 天线数 * 子载波数]
     # H : frequency domain 复数 (batch * 2 * 2 * 256) [样本数 * 接收天线数 * 发射天线数 * 子载波数]
