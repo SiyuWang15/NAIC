@@ -26,9 +26,9 @@ class FullRunner():
         self.FCconf = config.FC
     
     def get_model(self, device):
-        if self.config.model == 'cnn':
+        if self.config.cnnmodel == 'base':
             CNN = CNN_Estimation()
-        elif self.config.model == 'resnet34':
+        elif self.config.cnnmodel == 'resnet34':
             CNN = ResNet34()
         else:
             raise NotImplementedError
