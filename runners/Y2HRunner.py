@@ -58,9 +58,9 @@ class Y2HRunner():
         x_LS = x_LS[:,:,0,:] + x_LS[:,:,1,:]
         return x_LS
 
-    def get_LS(self, Yd_input, Hf):
+    def get_LS(self, Yd_input, Hf_input):
         Yd = np.array(Yd_input[:,0,:,:] + 1j*Yd_input[:,1,:,:])
-        Hf = np.array(Hf[:,0,:,:] + 1j*Hf[:,1,:,:]) 
+        Hf = np.array(Hf_input[:,0,:,:] + 1j*Hf_input[:,1,:,:]) 
         Hf = np.reshape(Hf, [-1,2,2,256], order = 'F')
         X_LS = self.LSequalization(Hf, Yd)
         X_LS.real = (X_LS.real > 0)*2 - 1
@@ -167,11 +167,11 @@ class Y2HRunner():
                 FC.load_state_dict(torch.load(fp))
             logging.info(f'Loading state dict of FC from {self.config.train.FC_resume}, random initialize CNN')
         
-        if self.config.train.freeze_FC:
-            for param in FC.parameters():
-                param.requires_grad = False
-            logging.info('Freeze FC layer.')
-            FC.eval()
+        
+        for param in FC.parameters():
+            param.requires_grad = False
+        logging.info('Freeze FC layer.')
+        FC.eval()
         
         best_nmse = 1000.
         
@@ -181,7 +181,7 @@ class Y2HRunner():
         logging.info('freeze CNN.')
         
         SD = XYH2X_ResNet18()
-        fp = '/data/siyu/NAIC/workspace/mingyao/XYH2X_Resnet18_SD_mode0_Pilot8.pth.tar'
+        fp = '/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_0_Pn_8/mingyao/XYH2X_Resnet18_SD_mode0_Pilot8.pth.tar'
         SD.load_state_dict(torch.load(fp)['state_dict'])
         for param in SD.parameters():
             param.requires_grad = False
@@ -190,31 +190,34 @@ class Y2HRunner():
         logging.info(f'load state dict of SD and freeze it.')
 
         CE2 = XDH2H_Resnet()
-        fp = '/data/siyu/NAIC/workspace/mingyao/XDH2H_Resnet34_SD_mode0_Pilot8.pth.tar'
+        fp = '/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_0_Pn_8/mingyao/Best_XDH2H_Resnet34_SD_mode0_Pilot8.pth.tar'
         CE2.load_state_dict(torch.load(fp)['state_dict'])
-        CE3 = copy.deepcopy(CE2)
-        CE2.eval()
-        CE2.to(device)
-        CE3.to(device)
-        for param in CE2.parameters():
-            param.requires_grad = False
-        logging.info('freeze CE2.')
+        # CE3 = copy.deepcopy(CE2)
+        # CE2.eval()
+        # CE2.to(device)
+        # CE3.to(device)
+        # for param in CE2.parameters():
+        #     param.requires_grad = False
+        # logging.info('freeze CE2.')
 
         FC = nn.DataParallel(FC).to(device)
         CNN = nn.DataParallel(CNN).to(device)
         SD = nn.DataParallel(SD).to(device)
         CE2 = nn.DataParallel(CE2).to(device)
-        CE3 = nn.DataParallel(CE3).to(device)
+        FC.eval()
+        CNN.eval()
+        SD.eval()
+        CE2.train()
 
-        optimizer_CE3 = self.get_optimizer(CE3.module.parameters(), lr = 0.0001)
-        CE3.train()
+        optimizer_CE2 = self.get_optimizer(CE2.parameters(), lr = 0.0001)
+        # CE3.train()
 
         criterion = NMSELoss()
         # optimizer_CNN = self.get_optimizer(filter(lambda p: p.requires_grad,  CNN.parameters()), self.config.train.cnn_lr)
          
         logging.info('Everything prepared well, start to train...')
         for epoch in range(self.config.n_epochs):
-            CE3.eval()
+            CE2.eval()
             with torch.no_grad():
                 Ht1_list = []
                 Ht2_list = []
@@ -251,65 +254,35 @@ class Y2HRunner():
                     # input4 = torch.cat([X_input_test.cuda(), Yd_input_test.cuda(), H_test_padding], 2)
                     input4 = torch.cat([output3.cuda(), Yd.cuda(), H_test_padding], dim=2)
 
-                    output4 = CE2(input4).reshape(bs, 2, 4, 32)
-
-                    H_test_padding = copy.deepcopy(output4)
-                    output4 = output4.cpu()
-
-                    H_test_padding = torch.cat([H_test_padding, torch.zeros(bs,2,4,256-32, requires_grad=True).to(device)],dim=3)
-                    H_test_padding = H_test_padding.permute(0,2,3,1)
-
-                    H_test_padding = torch.fft(H_test_padding, 1)/20
-                    H_test_padding = H_test_padding.permute(0,3,1,2).contiguous() 
-
-                    X_LS = self.get_LS(Yd, H_test_padding.detach().cpu())
-                    X_input_test = torch.zeros([bs, 2, 2, 256], dtype = torch.float32)
-                    X_input_test[:,0,:,:] = torch.tensor(X_LS.real, dtype = torch.float32)
-                    X_input_test[:,1,:,:] = torch.tensor(X_LS.imag, dtype = torch.float32)
-                    
-                    input5 = torch.cat([X_input_test.to(device), Yp4cnn.to(device), Yd.to(device), H_test_padding], dim = 2)
-                    output5 = SD(input5).reshape([bs, 2, 256, 2])
-                    output5 = output5.permute(0, 3, 1, 2).contiguous()
-
-                    input6 = torch.cat([output5, Yd.cuda(), H_test_padding], 2)
-                    output6 =  CE3(input6).reshape(bs, 2, 4, 32).cpu()
-
-
-                    # 计算loss
-                    # nmse1 = criterion(output2.reshape(bs, 2, 4, 32).detach().cpu(), Ht_test_label)
-                    # nmse1 = nmse1.numpy()
-                    # nmse2 = criterion(output4.detach().cpu(), Ht_test_label)
-                    # nmse2 = nmse2.numpy()
-
+                    output4 = CE2(input4).reshape(bs, 2, 4, 32).detach().cpu()
 
                     Ht1_list.append(output2)
                     Ht2_list.append(output4)
-                    Ht3_list.append(output6)
                     Hlabel_list.append(H_label)
 
                 Ht1 = torch.cat(Ht1_list, dim = 0)
                 Ht2 = torch.cat(Ht2_list, dim = 0)
-                Ht3 = torch.cat(Ht3_list, dim = 0)
                 Hlabel = torch.cat(Hlabel_list, dim = 0)
-                loss1, loss2, loss3 = criterion(Ht1, Hlabel), criterion(Ht2, Hlabel), criterion(Ht3, Hlabel)
-                if loss3 < best_nmse:
-                    best_nmse = loss3.item()
+                loss1, loss2 = criterion(Ht1, Hlabel), criterion(Ht2, Hlabel)
+                if loss2 < best_nmse:
+                    best_nmse = loss2.item()
                     state_dicts = {
-                        'CE3': CE3.state_dict(),
+                        'CE2': CE2.state_dict(),
                         'epoch_num': epoch
                     }
                     torch.save(state_dicts, os.path.join(self.config.ckpt_dir, f'best.pth'))
                 if epoch % self.config.save_freq == 0:
                     fp = os.path.join(self.config.ckpt_dir, f'epoch{epoch}.pth')
                     state_dicts = {
-                        'CE3': CE3.state_dict()
+                        'CE2': CE2.state_dict()
                     }
                     torch.save(state_dicts, fp)
                     logging.info(f'{fp} saved.')
-                logging.info(f'Validation Epoch [{epoch}]/[{self.config.n_epochs}] || nmse1 {loss1.item():.5f}, nmse2: {loss2.item():.5f}, nmse3: {loss3.item():.5f}, best nmse: {best_nmse:.5f}')
+                logging.info(f'Validation Epoch [{epoch}]/[{self.config.n_epochs}] || nmse1 {loss1.item():.5f}, nmse2: {loss2.item():.5f}, best nmse: {best_nmse:.5f}')
             
-            CE3.train()
+            CE2.train()
             for it, (Yp4fc, Yp4cnn, Yd, X, H_label) in enumerate(train_loader): # H_train: bsx2(real and imag)x4x32
+                optimizer_CE2.zero_grad()
                 bs = Yp4fc.shape[0]
                 Yp4fc = Yp4fc.to(device)
                 Hf = FC(Yp4fc)
@@ -318,60 +291,39 @@ class Y2HRunner():
                 cnn_input = torch.cat([Yd.to(device), Yp4cnn.to(device), Hf], dim = 2)
                 output2 = CNN(cnn_input).reshape(bs, 2, 4, 32)
                 
-                H_test_padding = copy.deepcopy(output2)
+                H_train_padding = copy.deepcopy(output2)
                 output2 = output2.cpu() 
-                H_test_padding = torch.cat([H_test_padding, torch.zeros(bs,2,4,256-32, requires_grad=True).to(device)],3)
-                H_test_padding = H_test_padding.permute(0,2,3,1)
+                H_train_padding = torch.cat([H_train_padding, torch.zeros(bs,2,4,256-32, requires_grad=True).to(device)],3)
+                H_train_padding = H_train_padding.permute(0,2,3,1)
 
-                H_test_padding = torch.fft(H_test_padding, 1)/20
-                H_test_padding = H_test_padding.permute(0,3,1,2).contiguous() 
+                H_train_padding = torch.fft(H_train_padding, 1)/20
+                H_train_padding = H_train_padding.permute(0,3,1,2).contiguous() 
 
-                X_LS = self.get_LS(Yd, H_test_padding.detach().cpu())
-                X_input_test = torch.zeros([bs, 2, 2, 256], dtype = torch.float32)
-                X_input_test[:,0,:,:] = torch.tensor(X_LS.real, dtype = torch.float32)
-                X_input_test[:,1,:,:] = torch.tensor(X_LS.imag, dtype = torch.float32)
+                X_LS = self.get_LS(Yd, H_train_padding.detach().cpu())
+                X_input_train = torch.zeros([bs, 2, 2, 256], dtype = torch.float32)
+                X_input_train[:,0,:,:] = torch.tensor(X_LS.real, dtype = torch.float32)
+                X_input_train[:,1,:,:] = torch.tensor(X_LS.imag, dtype = torch.float32)
 
-                input3 = torch.cat([X_input_test.cuda(), Yp4cnn.to(device), Yd.cuda(), H_test_padding], dim = 2)
+                input3 = torch.cat([X_input_train.cuda(), Yp4cnn.to(device), Yd.cuda(), H_train_padding.to(device)], dim = 2)
                 output3 = SD(input3)
 
                 output3 = output3.reshape([bs,2,256,2])
                 output3 = output3.permute(0,3,1,2).contiguous()
 
                 # input4 = torch.cat([X_input_test.cuda(), Yd_input_test.cuda(), H_test_padding], 2)
-                input4 = torch.cat([output3.cuda(), Yd.cuda(), H_test_padding], 2)
+                input4 = torch.cat([output3.cuda(), Yd.cuda(), H_train_padding], 2)
 
                 output4 = CE2(input4).reshape(bs, 2, 4, 32)
 
-                Ht2 = output4.cpu()
-                H_test_padding = output4
-
-
-                H_test_padding = torch.cat([H_test_padding, torch.zeros(bs,2,4,256-32, requires_grad=True).to(device)],3)
-                H_test_padding = H_test_padding.permute(0,2,3,1)
-
-                H_test_padding = torch.fft(H_test_padding, 1)/20
-                H_test_padding = H_test_padding.permute(0,3,1,2).contiguous() 
-
-                X_LS = self.get_LS(Yd, H_test_padding.detach().cpu())
-                X_input_test = torch.zeros([bs, 2, 2, 256], dtype = torch.float32)
-                X_input_test[:,0,:,:] = torch.tensor(X_LS.real, dtype = torch.float32)
-                X_input_test[:,1,:,:] = torch.tensor(X_LS.imag, dtype = torch.float32)
-                
-                input5 = torch.cat([X_input_test.to(device), Yp4cnn.to(device), Yd.to(device), H_test_padding], dim = 2)
-                output5 = SD(input5).reshape([bs, 2, 256, 2])
-                output5 = output5.permute(0, 3, 1, 2).contiguous()
-
-                input6 = torch.cat([output5, Yd.cuda(), H_test_padding], 2)
-                output6 =  CE3(input6).reshape(bs, 2, 4, 32).cpu()
-
-                loss = criterion(output6, H_label)
+                loss = criterion(output4, H_label.to(device))
+                nmse1 = criterion(output2, H_label)
                 loss.backward()
-                optimizer_CE3.step()
+                optimizer_CE2.step()
 
                 if it % self.config.print_freq == 0:
                     # print(nmse)
-                    logging.info(f'CNN Mode:{self.mode} || Epoch: [{epoch}/{self.config.n_epochs}][{it}/{len(train_loader)}]\t Loss {loss.item():.5f}')
+                    logging.info(f'CE2 Mode:{self.mode} || Epoch: [{epoch}/{self.config.n_epochs}][{it}/{len(train_loader)}]\t Loss {loss.item():.5f}\t nmse1 {nmse1.item():.5f}')
 
             if epoch >0:
                 if epoch % self.config.lr_decay ==0:
-                    optimizer_CE3.param_groups[0]['lr'] =  max(optimizer_CE3.param_groups[0]['lr'] * 0.5, self.config.lr_threshold)
+                    optimizer_CE2.param_groups[0]['lr'] =  max(optimizer_CE2.param_groups[0]['lr'] * 0.5, self.config.lr_threshold)
