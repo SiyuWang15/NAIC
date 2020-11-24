@@ -6,8 +6,9 @@ import numpy as np
 import logging
 import os
 import sys
+import copy
 sys.path.append('..')
-from Estimators import CNN_Estimation, FC_ELU_Estimation, NMSELoss, ResNet34, ResNet50, ResNet101, Densenet
+from Estimators import CNN_Estimation, FC_ELU_Estimation, NMSELoss, ResNet34, ResNet50, ResNet101, Densenet, XYH2X_ResNet18, XDH2H_Resnet
 from data import get_YH_data_random
 from utils import *
 
@@ -38,6 +39,33 @@ class Y2HRunner():
         val_loader = DataLoader(val_set, batch_size=self.config.train.val_batch_size, \
             shuffle=False, num_workers=16, drop_last=False)
         return train_loader, val_loader
+    
+    def LSequalization(self, h, y):
+        # y 复数： batch*2*256
+        # h 复数： batch*2*2*256
+        batch = h.shape[0]
+        norm = h[:,0,0,:] * h[:,1,1,:] - h[:,0,1,:] * h[:,1,0,:]
+        norm = norm.reshape([batch,1,1,256])
+        invh = np.zeros([batch,2,2,256], dtype = np.complex64)
+        invh[:,0,0,:] = h[:,1,1,:]
+        invh[:,1,1,:] = h[:,0,0,:]
+        invh[:,0,1,:] = -h[:,0,1,:]
+        invh[:,1,0,:] = -h[:,1,0,:]
+        invh = invh/norm
+        y = y.reshape(batch, 1, 2, 256)
+        
+        x_LS = invh*y
+        x_LS = x_LS[:,:,0,:] + x_LS[:,:,1,:]
+        return x_LS
+
+    def get_LS(self, Yd_input, Hf):
+        Yd = np.array(Yd_input[:,0,:,:] + 1j*Yd_input[:,1,:,:])
+        Hf = np.array(Hf[:,0,:,:] + 1j*Hf[:,1,:,:]) 
+        Hf = np.reshape(Hf, [-1,2,2,256], order = 'F')
+        X_LS = self.LSequalization(Hf, Yd)
+        X_LS.real = (X_LS.real > 0)*2 - 1
+        X_LS.imag = (X_LS.imag > 0)*2 - 1
+        return X_LS
 
     def train_FC(self):
         device = 'cuda'
@@ -147,25 +175,45 @@ class Y2HRunner():
         
         best_nmse = 1000.
         
-        for k, v in CNN.named_parameters():
-            if k == 'linear.weight' or k == 'linear.bias':
-                logging.info('do not freeze linear layer.')
-                v.requires_grad = True
-            else:
-                v.requires_grad = False
+        for param in CNN.parameters():
+            param.requires_grad = False
+        CNN.eval()
+        logging.info('freeze CNN.')
+        
+        SD = XYH2X_ResNet18()
+        fp = '/data/siyu/NAIC/workspace/mingyao/XYH2X_Resnet18_SD_mode0_Pilot8.pth.tar'
+        SD.load_state_dict(torch.load(fp)['state_dict'])
+        for param in SD.parameters():
+            param.requires_grad = False
+        SD.eval()
+        SD.to(device)
+        logging.info(f'load state dict of SD and freeze it.')
+
+        CE2 = XDH2H_Resnet()
+        fp = '/data/siyu/NAIC/workspace/mingyao/XDH2H_Resnet34_SD_mode0_Pilot8.pth.tar'
+        CE2.load_state_dict(torch.load(fp)['state_dict'])
+        CE3 = copy.deepcopy(CE2)
+        CE2.eval()
+        CE2.to(device)
+        CE3.to(device)
+        for param in CE2.parameters():
+            param.requires_grad = False
+        logging.info('freeze CE2.')
+
+
+        optimizer_CE3 = self.get_optimizer(CE3.parameters(), lr = 0.0001)
+        CE3.train()
 
         criterion = NMSELoss()
-        optimizer_CNN = self.get_optimizer(filter(lambda p: p.requires_grad,  CNN.parameters()), self.config.train.cnn_lr)
-        symbol = not self.config.train.freeze_FC
-        if symbol:
-            optimizer_FC = self.get_optimizer(FC.parameters(), self.config.train.fc_lr)
-            
+        # optimizer_CNN = self.get_optimizer(filter(lambda p: p.requires_grad,  CNN.parameters()), self.config.train.cnn_lr)
+         
         logging.info('Everything prepared well, start to train...')
         for epoch in range(self.config.n_epochs):
-            CNN.eval()
-            FC.eval()
+            CE3.eval()
             with torch.no_grad():
-                Ht_list = []
+                Ht1_list = []
+                Ht2_list = []
+                Ht3_list = []
                 Hlabel_list = []
                 for Yp4fc, Yp4cnn, Yd, X, H_label in val_loader:
                     bs = Yp4fc.shape[0]
@@ -173,67 +221,147 @@ class Y2HRunner():
                     Hf = FC(Yp4fc)
                     Yp4fc = Yp4fc.cpu() # release gpu memory
                     Hf = Hf.reshape(bs, 2, 4, 256)
-                    if self.config.use_yp:
-                        cnn_input = torch.cat([Yd.to(device), Yp4cnn.to(device), Hf], dim = 2)
-                    else:
-                        cnn_input = torch.cat([Yd.to(device), Hf], dim = 2)
-                    Ht = CNN(cnn_input).reshape(bs, 2, 4, 32).cpu()
-                    # Ht = CNN(cnn_input).reshape(bs, 2, 32).cpu()
-                    Ht_list.append(Ht)
-                    Hlabel_list.append(H_label.float())
-                Ht = torch.cat(Ht_list, dim = 0)
+                    cnn_input = torch.cat([Yd.to(device), Yp4cnn.to(device), Hf], dim = 2)
+                    output2 = CNN(cnn_input).reshape(bs, 2, 4, 32)
+                    
+                    H_test_padding = copy.deepcopy(output2)
+                    output2 = output2.cpu() 
+                    H_test_padding = torch.cat([H_test_padding, torch.zeros(bs,2,4,256-32, requires_grad=True).to(device)],3)
+                    H_test_padding = H_test_padding.permute(0,2,3,1)
+
+                    H_test_padding = torch.fft(H_test_padding, 1)/20
+                    H_test_padding = H_test_padding.permute(0,3,1,2).contiguous() 
+
+                    X_LS = self.get_LS(Yd, H_test_padding.detach().cpu())
+                    X_input_test = torch.zeros([bs, 2, 2, 256], dtype = torch.float32)
+                    X_input_test[:,0,:,:] = torch.tensor(X_LS.real, dtype = torch.float32)
+                    X_input_test[:,1,:,:] = torch.tensor(X_LS.imag, dtype = torch.float32)
+
+                    input3 = torch.cat([X_input_test.cuda(), Yp4cnn.to(device), Yd.cuda(), H_test_padding], 2)
+                    output3 = SD(input3)
+
+                    output3 = output3.reshape([bs,2,256,2])
+                    output3 = output3.permute(0,3,1,2).contiguous()
+
+                    # input4 = torch.cat([X_input_test.cuda(), Yd_input_test.cuda(), H_test_padding], 2)
+                    input4 = torch.cat([output3.cuda(), Yd.cuda(), H_test_padding], dim=2)
+
+                    output4 = CE2(input4).reshape(bs, 2, 4, 32)
+
+                    H_test_padding = copy.deepcopy(output4)
+                    output4 = output4.cpu()
+
+                    H_test_padding = torch.cat([H_test_padding, torch.zeros(bs,2,4,256-32, requires_grad=True).to(device)],dim=3)
+                    H_test_padding = H_test_padding.permute(0,2,3,1)
+
+                    H_test_padding = torch.fft(H_test_padding, 1)/20
+                    H_test_padding = H_test_padding.permute(0,3,1,2).contiguous() 
+
+                    X_LS = self.get_LS(Yd, H_test_padding.detach().cpu())
+                    X_input_test = torch.zeros([bs, 2, 2, 256], dtype = torch.float32)
+                    X_input_test[:,0,:,:] = torch.tensor(X_LS.real, dtype = torch.float32)
+                    X_input_test[:,1,:,:] = torch.tensor(X_LS.imag, dtype = torch.float32)
+                    
+                    input5 = torch.cat([X_input_test.to(device), Yp4cnn.to(device), Yd.to(device), H_test_padding], dim = 2)
+                    output5 = SD(input5).reshape([bs, 2, 256, 2])
+                    output5 = output5.permute(0, 3, 1, 2).contiguous()
+
+                    input6 = torch.cat([output5, Yd.cuda(), H_test_padding], 2)
+                    output6 =  CE3(input6).reshape(bs, 2, 4, 32).cpu()
+
+
+                    # 计算loss
+                    # nmse1 = criterion(output2.reshape(bs, 2, 4, 32).detach().cpu(), Ht_test_label)
+                    # nmse1 = nmse1.numpy()
+                    # nmse2 = criterion(output4.detach().cpu(), Ht_test_label)
+                    # nmse2 = nmse2.numpy()
+
+
+                    Ht1_list.append(output2)
+                    Ht2_list.append(output4)
+                    Ht3_list.append(output6)
+                    Hlabel_list.append(H_label)
+
+                Ht1 = torch.cat(Ht1_list, dim = 0)
+                Ht2 = torch.cat(Ht2_list, dim = 0)
+                Ht3 = torch.cat(Ht3_list, dim = 0)
                 Hlabel = torch.cat(Hlabel_list, dim = 0)
-                loss = criterion(Ht, Hlabel)
-                if loss < best_nmse:
-                    best_nmse = loss.item()
+                loss1, loss2, loss3 = criterion(Ht1, Hlabel), criterion(Ht2, Hlabel), criterion(Ht3, Hlabel)
+                if loss3 < best_nmse:
+                    best_nmse = loss3.item()
                     state_dicts = {
-                        'cnn': CNN.state_dict(),
-                        'fc': FC.state_dict(),
+                        'CE3': CE3.state_dict(),
                         'epoch_num': epoch
                     }
                     torch.save(state_dicts, os.path.join(self.config.ckpt_dir, f'best.pth'))
                 if epoch % self.config.save_freq == 0:
                     fp = os.path.join(self.config.ckpt_dir, f'epoch{epoch}.pth')
                     state_dicts = {
-                        'cnn': CNN.state_dict(),
-                        'fc': FC.state_dict()
+                        'CE3': CE3.state_dict()
                     }
                     torch.save(state_dicts, fp)
                     logging.info(f'{fp} saved.')
-                logging.info(f'Validation Epoch [{epoch}]/[{self.config.n_epochs}] || NMSE {loss.item():.5f}, best nmse: {best_nmse:.5f}')
-                
-                
-            current_lr = optimizer_CNN.param_groups[0]['lr']
-            if symbol:
-                current_fc_lr = optimizer_FC.param_groups[0]['lr']
-                logging.info(f'Epoch [{epoch}]/[{self.config.n_epochs}] cnn learning rate: {current_lr:.4e}, fc learning rate: {current_fc_lr:.4e}')
-            else:
-                logging.info(f'Epoch [{epoch}]/[{self.config.n_epochs}] learning rate: {current_lr:.4e}')
-            # model training
-            CNN.train()
-            if symbol:
-                FC.train()
-
+                logging.info(f'Validation Epoch [{epoch}]/[{self.config.n_epochs}] || nmse1 {loss1.item():.5f}, nmse2: {loss2.item():.5f}, nmse3: {loss3.item():.5f}, best nmse: {best_nmse:.5f}')
+            
+            CE3.train()
             for it, (Yp4fc, Yp4cnn, Yd, X, H_label) in enumerate(train_loader): # H_train: bsx2(real and imag)x4x32
                 bs = Yp4fc.shape[0]
-                optimizer_CNN.zero_grad()
                 Yp4fc = Yp4fc.to(device)
                 Hf = FC(Yp4fc)
                 Yp4fc = Yp4fc.cpu() # release gpu memory
                 Hf = Hf.reshape(bs, 2, 4, 256)
-                if self.config.use_yp:
-                    cnn_input = torch.cat([Yd.to(device), Yp4cnn.to(device), Hf], dim = 2)
-                else:
-                    cnn_input = torch.cat([Yd.to(device), Hf], dim = 2)
-                Ht = CNN(cnn_input).reshape(bs, 2, 4, 32)
-                # Ht = CNN(cnn_input).reshape(bs, 2, 32)
-                H_label = H_label.to(device)
+                cnn_input = torch.cat([Yd.to(device), Yp4cnn.to(device), Hf], dim = 2)
+                output2 = CNN(cnn_input).reshape(bs, 2, 4, 32)
+                
+                H_test_padding = copy.deepcopy(output2)
+                output2 = output2.cpu() 
+                H_test_padding = torch.cat([H_test_padding, torch.zeros(bs,2,4,256-32, requires_grad=True).to(device)],3)
+                H_test_padding = H_test_padding.permute(0,2,3,1)
 
-                loss = criterion(Ht, H_label)
+                H_test_padding = torch.fft(H_test_padding, 1)/20
+                H_test_padding = H_test_padding.permute(0,3,1,2).contiguous() 
+
+                X_LS = self.get_LS(Yd, H_test_padding.detach().cpu())
+                X_input_test = torch.zeros([bs, 2, 2, 256], dtype = torch.float32)
+                X_input_test[:,0,:,:] = torch.tensor(X_LS.real, dtype = torch.float32)
+                X_input_test[:,1,:,:] = torch.tensor(X_LS.imag, dtype = torch.float32)
+
+                input3 = torch.cat([X_input_test.cuda(), Yp4cnn.to(device), Yd.cuda(), H_test_padding], dim = 2)
+                output3 = SD(input3)
+
+                output3 = output3.reshape([bs,2,256,2])
+                output3 = output3.permute(0,3,1,2).contiguous()
+
+                # input4 = torch.cat([X_input_test.cuda(), Yd_input_test.cuda(), H_test_padding], 2)
+                input4 = torch.cat([output3.cuda(), Yd.cuda(), H_test_padding], 2)
+
+                output4 = CE2(input4).reshape(bs, 2, 4, 32)
+
+                Ht2 = output4.cpu()
+                H_test_padding = output4
+
+
+                H_test_padding = torch.cat([H_test_padding, torch.zeros(bs,2,4,256-32, requires_grad=True).to(device)],3)
+                H_test_padding = H_test_padding.permute(0,2,3,1)
+
+                H_test_padding = torch.fft(H_test_padding, 1)/20
+                H_test_padding = H_test_padding.permute(0,3,1,2).contiguous() 
+
+                X_LS = self.get_LS(Yd, H_test_padding.detach().cpu())
+                X_input_test = torch.zeros([bs, 2, 2, 256], dtype = torch.float32)
+                X_input_test[:,0,:,:] = torch.tensor(X_LS.real, dtype = torch.float32)
+                X_input_test[:,1,:,:] = torch.tensor(X_LS.imag, dtype = torch.float32)
+                
+                input5 = torch.cat([X_input_test.to(device), Yp4cnn.to(device), Yd.to(device), H_test_padding], dim = 2)
+                output5 = SD(input5).reshape([bs, 2, 256, 2])
+                output5 = output5.permute(0, 3, 1, 2).contiguous()
+
+                input6 = torch.cat([output5, Yd.cuda(), H_test_padding], 2)
+                output6 =  CE3(input6).reshape(bs, 2, 4, 32).cpu()
+
+                loss = criterion(output6, H_label)
                 loss.backward()
-                optimizer_CNN.step()
-                if symbol:
-                    optimizer_FC.step()
+                optimizer_CE3.step()
 
                 if it % self.config.print_freq == 0:
                     # print(nmse)
@@ -241,13 +369,4 @@ class Y2HRunner():
 
             if epoch >0:
                 if epoch % self.config.lr_decay ==0:
-                    optimizer_CNN.param_groups[0]['lr'] =  optimizer_CNN.param_groups[0]['lr'] * 0.5
-                    if symbol:
-                        optimizer_FC.param_groups[0]['lr'] =  optimizer_FC.param_groups[0]['lr'] * 0.5
-            
-                if optimizer_CNN.param_groups[0]['lr'] < self.config.lr_threshold:
-                    optimizer_CNN.param_groups[0]['lr'] = self.config.lr_threshold
-                    if symbol:
-                        optimizer_FC.param_groups[0]['lr'] =  self.config.lr_threshold
-
-            
+                    optimizer_CE3.param_groups[0]['lr'] =  max(optimizer_CE3.param_groups[0]['lr'] * 0.5, self.config.lr_threshold)

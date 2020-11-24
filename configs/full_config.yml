@@ -1,6 +1,7 @@
 # config for full runner
+model: resnet34
 cnnmodel: base # base or resnet34 or resnet50
-Pn: 8
+Pn: 32
 mode: 0
 use_yp: True
 batch_size: 500
@@ -9,5 +10,5 @@ FC:
   h_dim: 4096
   out_dim: 2048
   n_blocks: 2
-resume: 1120-14-53-06
+resume: 1122-20-59-18
 run_mode: validation  # validation or testing
