@@ -365,6 +365,7 @@ class Y2HRunner():
                 output6 =  CE3(input6).reshape(bs, 2, 4, 32).cpu()
 
                 loss = criterion(output6, H_label)
+                optimizer_CE3.zero_grad()
                 loss.backward()
                 optimizer_CE3.step()
 
