@@ -191,7 +191,7 @@ class BasicBlock(nn.Module):
 
 
 class Denoise_Resnet18(nn.Module):
-    def __init__(self, block=BasicBlock, num_blocks=[2,2,2,2], num_classes=2048):
+    def __init__(self, block=BasicBlock, num_blocks=[2,2,2,2], num_classes=1024):
         super().__init__()
         self.in_planes = 64
 

@@ -1,5 +1,5 @@
 mode: 0
-Pn: 8
+Pn: 32
 model: resnet18 # unet resnet18
 n_epochs: 300
 print_freq: 100

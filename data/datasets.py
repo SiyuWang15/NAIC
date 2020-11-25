@@ -73,11 +73,13 @@ class RandomDataset():
         Yp4fc = Y1[:, 0, :, :].reshape(-1)
         net_input = np.stack([Y1[0,0,0,:], Y1[1,0,0,:], Y1[0,0,1,:], Y1[1,0,1,:], \
             Y1[0,1,0,:], Y1[1,1,0,:], Y1[0,1,1,:], Y1[1,1,1,:]], axis = 0)
+        # net_input = np.stack([Y1[0,0,0,:], Y1[1,0,0,:], Y1[0,0,1,:], Y1[1,0,1,:]], axis = 0)
         net_input = np.expand_dims(net_input, 0)
         Y2 = MIMO([bits0, bits1], HH, 100., 0, self.Pn) / 20.
         Y2 = np.reshape(Y2, [2, 2, 2, 256], order = 'F').astype('float32')
-        label = np.stack([Y2[0,0,0,:], Y2[1,0,0,:], Y2[0,0,1,:], Y2[1,0,1,:], \
-            Y2[0,1,0,:], Y2[1,1,0,:], Y2[0,1,1,:], Y2[1,1,1,:]], axis = 0)
+        # label = np.stack([Y2[0,0,0,:], Y2[1,0,0,:], Y2[0,0,1,:], Y2[1,0,1,:], \
+        #     Y2[0,1,0,:], Y2[1,1,0,:], Y2[0,1,1,:], Y2[1,1,1,:]], axis = 0)
+        label = np.stack([Y2[0,0,0,:], Y2[1,0,0,:], Y2[0,0,1,:], Y2[1,0,1,:]], axis = 0)
         label = np.expand_dims(label, 0) 
         XX = np.concatenate([bits0, bits1], 0).astype('float32')
         newHH = np.stack([HH.real, HH.imag], axis = 0).astype('float32')
@@ -107,7 +109,8 @@ class DenoiseDataset(Dataset):
         net_input = np.stack([Y1[0,0,0,:], Y1[1,0,0,:], Y1[0,0,1,:], Y1[1,0,1,:], \
             Y1[0,1,0,:], Y1[1,1,0,:], Y1[0,1,1,:], Y1[1,1,1,:]], axis = 0)
         net_input = np.expand_dims(net_input, 0)
-        label = np.stack([Y2[0,0,0,:], Y2[1,0,0,:], Y2[0,0,1,:], Y2[1,0,1,:], \
-            Y2[0,1,0,:], Y2[1,1,0,:], Y2[0,1,1,:], Y2[1,1,1,:]], axis = 0)
+        # label = np.stack([Y2[0,0,0,:], Y2[1,0,0,:], Y2[0,0,1,:], Y2[1,0,1,:], \
+        #     Y2[0,1,0,:], Y2[1,1,0,:], Y2[0,1,1,:], Y2[1,1,1,:]], axis = 0)
+        label = np.stack([Y2[0,0,0,:], Y2[1,0,0,:], Y2[0,0,1,:], Y2[1,0,1,:]], axis =0 )
         label = np.expand_dims(label, 0) 
         return net_input, label

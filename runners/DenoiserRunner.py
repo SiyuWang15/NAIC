@@ -16,6 +16,9 @@ class DenoiserRunner():
         self.config = config
         self.mode = config.mode
         self.Pn = config.Pn
+        weight = torch.zeros(256)
+        weight[list(range(0, 256, 4))] = 1.
+        self.weight = weight
     
     def get_optimizer(self, parameters, lr):
         if self.config.train.optimizer == 'adam':
@@ -33,6 +36,36 @@ class DenoiserRunner():
             shuffle=False, num_workers=16, drop_last=False)
         return train_loader, val_loader
 
+    def loss(self, dy, ylabel): # bs x4x256
+        loss = ((dy - ylabel) ** 2) * self.weight.to(dy.device)
+        return loss.mean()
+
+    def evaluate(self):
+        device = 'cuda'
+        device = 'cuda'
+        train_loader, val_loader = self.get_dataloader()
+
+        model = Denoise_Resnet18().to(device)
+        
+        if not self.config.train.resume == 'None':
+            fp = os.path.join(f'/data/siyu/NAIC/workspace/denoiser/{self.config.train.resume}/mode_{self.mode}_Pn__{self.Pn}/checkpoints/best.pth')
+            model.load_state_dict(torch.load(fp)['denoiser'])
+            logging.info(f'Loading state dict from {fp}')
+
+        logging.info('Everything prepared well, start to evaludate...')
+        for epoch in range(self.config.n_epochs):
+            model.eval()
+            with torch.no_grad():
+                dy_list = []
+                ylabel_list = []
+                for Y, Y_label in val_loader:
+                    Y = Y.to(device)
+                    Y_label = Y_label.to(device)
+                    dY = model(Y).reshape(len(Y), 1, 4, 256)
+                    dy_list.append(dY.detach().cpu().numpy())
+                    ylabel_list.append(Y_label.numpy())
+                    
+                
     def run(self):
         device = 'cuda'
         train_loader, val_loader = self.get_dataloader()
@@ -47,9 +80,9 @@ class DenoiserRunner():
             fp = os.path.join(f'/data/siyu/NAIC/workspace/denoiser/{self.config.train.resume}/mode_{self.mode}_Pn__{self.Pn}/checkpoints/best.pth')
             model.load_state_dict(torch.load(fp))
             logging.info(f'Loading state dict from {fp}')
-        
+
         best_mse = 1000.
-        criterion = nn.MSELoss(reduction='mean')
+        # criterion = nn.MSELoss(reduction='mean')
         optimizer = self.get_optimizer(model.parameters(), self.config.train.lr)
         
         logging.info('Everything prepared well, start to train...')
@@ -60,11 +93,10 @@ class DenoiserRunner():
                 for Y, Y_label in val_loader:
                     Y = Y.to(device)
                     Y_label = Y_label.to(device)
-                    dY = model(Y).reshape(len(Y), 1, 8, 256)
-                    loss = criterion(dY, Y_label)
+                    dY = model(Y).reshape(len(Y), 1, 4, 256)
+                    loss = self.loss(dY, Y_label)
                     losses.append(loss)
                 loss = sum(losses)/ len(losses)
-                logging.info(f'Validation epoch [{epoch}] || MSE: {loss:.5f}, best MSE: {best_mse:.5f}')
                 if loss < best_mse:
                     best_mse = loss.item()
                     state_dicts = {
@@ -80,7 +112,8 @@ class DenoiserRunner():
                     }
                     torch.save(state_dicts, fp)
                     logging.info(f'{fp} saved.')
-
+                logging.info(f'Validation epoch [{epoch}] || MSE: {loss.item():.5f}, best MSE: {best_mse:.5f}')
+                
             model.train()
             current_lr = optimizer.param_groups[0]['lr']
             logging.info(f'Epoch [{epoch}]/[{self.config.n_epochs}] learning rate: {current_lr:.4e}')
@@ -88,8 +121,8 @@ class DenoiserRunner():
                 optimizer .zero_grad()
                 Y = Y.to(device)
                 Y_label = Y_label.to(device)
-                dY = model(Y).reshape(len(Y), 1, 8, 256)
-                loss = criterion(dY, Y_label)
+                dY = model(Y).reshape(len(Y), 1, 4, 256)
+                loss = self.loss(dY, Y_label)
                 loss.backward()
                 optimizer.step()
                 if it % self.config.print_freq == 0:
