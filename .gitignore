@@ -1,9 +1,23 @@
 # My own 
 *pth*
-*.vscode*
+*vscode*
 *.mat
-
-
+*.png
+*.pt
+*.csv
+*Pilot*
+*.log
+*.npy
+*.ipynb
+*ipynb*
+workspace/
+Submit
+Submit*
+develop/
+simulation_code_v1/
+dataset/
+haojiang/
+zz_trash/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -15,6 +29,8 @@ __pycache__/
 # Distribution / packaging
 .Python
 build/
+Ensemble/
+workspace*/
 develop-eggs/
 dist/
 downloads/
