@@ -3,35 +3,6 @@ import os
 import numpy as np 
 import logging
 
-gpu_list = '0,1'
-os.environ["CUDA_VISIBLE_DEVICES"] = gpu_list
-
-if not os.path.isdir('results'):
-    os.makedirs('./results')
-# 加载用于测试的接收数据 Y shape=[batch*2048]
-Y = np.loadtxt('data/Y_1.csv', dtype=np.float32, delimiter=',')
-
-
-print('Begin generating X_pre_1_1.bin')
-submit1(Y)
-print('==============================')
-
-print('Begin generating X_pre_1_2.bin')
-submit2(Y)
-print('==============================')
-
-print('Begin generating X_pre_1_3.bin')
-submit3(Y)
-print('==============================')
-
-print('Begin generating X_pre_1_4.bin')
-submit4(Y)
-print('==============================')
-
-print('Begin generating X_pre_1_5.bin')
-submit5(Y)
-ensemble()
-
 def ensemble():
     d = 'results'
     Pn = 32
@@ -81,3 +52,29 @@ def ensemble():
         infom.append(s)
     for s in infom:
         f.write(s+'\n')
+
+if not os.path.isdir('results'):
+    os.makedirs('./results')
+# 加载用于测试的接收数据 Y shape=[batch*2048]
+Y = np.loadtxt('data/Y_1.csv', dtype=np.float32, delimiter=',')
+
+
+print('Begin generating X_pre_1_1.bin')
+submit1(Y)
+print('==============================')
+
+print('Begin generating X_pre_1_2.bin')
+submit2(Y)
+print('==============================')
+
+print('Begin generating X_pre_1_3.bin')
+submit3(Y)
+print('==============================')
+
+print('Begin generating X_pre_1_4.bin')
+submit4(Y)
+print('==============================')
+
+print('Begin generating X_pre_1_5.bin')
+submit5(Y)
+ensemble()

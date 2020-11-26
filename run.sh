@@ -18,12 +18,14 @@ time=$(date "+%m%d-%H-%M-%S")
 # CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py --runner sdce --Pn 8 --time $time
 
 # ======================================================================================================
-# To generate final submit .bin file, please run this line
+# To generate final submitted .bin file, please run this line
 
-## Pilot_num = 32
 cd Pn32_Final_Submit
-# CUDA_VISIBLE_DEVICES=6,7 python main.py 
-
-## Pilot_num = 8
-cd ../Pn8_Final_Submit
+CUDA_VISIBLE_DEVICES=6,7 python main.py 
+cd ..
+cd Pn8_Final_Submit
 CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py
+cd ..
+mkdir Submit
+cp ./Pn32_Final_Submit/results/X_pre_2.bin ./Submit/
+cp ./Pn8_Final_Submit/results/X_pre_1.bin ./Submit/
