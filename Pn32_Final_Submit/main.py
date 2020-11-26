@@ -3,9 +3,11 @@ import os
 import numpy as np 
 import logging
 
-gpu_list = '6,7'
+gpu_list = '0,1'
 os.environ["CUDA_VISIBLE_DEVICES"] = gpu_list
 
+if not os.path.isdir('results'):
+    os.makedirs('./results')
 # 加载用于测试的接收数据 Y shape=[batch*2048]
 Y = np.loadtxt('data/Y_1.csv', dtype=np.float32, delimiter=',')
 

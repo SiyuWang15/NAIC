@@ -10,6 +10,9 @@ import submit.Submit_CE_FC_Resnet34_SD_LS_XYH_CE2_CNN_NSoftMLCE_pilot8 as S5
 
 
 def generate_X_pre2(prefix = './', gpu_list = '0,1'):
+    if not os.path.isdir('./results'):
+        os.makedirs('./results')
+        
     print('-'*10, 'Begin Generating!','-'*10)
     # 1
     print('-'*10, 'Generate S1','-'*10)

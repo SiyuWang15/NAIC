@@ -22,8 +22,8 @@ time=$(date "+%m%d-%H-%M-%S")
 
 ## Pilot_num = 32
 cd Pn32_Final_Submit
-CUDA_VISIBLE_DEVICES=6,7 python main.py 
+# CUDA_VISIBLE_DEVICES=6,7 python main.py 
 
 ## Pilot_num = 8
-# cd Pn8_Final_Submit
-# CUDA_VISIBLE_DEVICES=0,1 python main.py
+cd ../Pn8_Final_Submit
+CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py
