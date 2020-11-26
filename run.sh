@@ -27,5 +27,5 @@ cd Pn8_Final_Submit
 CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py
 cd ..
 mkdir Submit
-cp ./Pn32_Final_Submit/results/X_pre_2.bin ./Submit/
-cp ./Pn8_Final_Submit/results/X_pre_1.bin ./Submit/
+cp ./Pn8_Final_Submit/X_pre_2.bin ./Submit/
+cp ./Pn32_Final_Submit/X_pre_1.bin ./Submit/

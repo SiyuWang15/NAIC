@@ -32,7 +32,7 @@ def ensemble():
     x = (predx.sum(axis = 0) > threshold)
 
     tag = 1 if Pn == 32 else 2
-    fp = f'{d}/X_pre_{tag}.bin'
+    fp = f'./X_pre_{tag}.bin'
     x.tofile(fp)
     logging.info(f'{fp} saved.')
 
