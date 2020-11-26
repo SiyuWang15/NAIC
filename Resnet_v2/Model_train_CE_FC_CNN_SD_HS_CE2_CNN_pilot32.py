@@ -16,6 +16,8 @@ from torch.optim import lr_scheduler
 from torch.utils.data import Dataset, DataLoader
 from MLreceiver_wo_print import *
 from LSreveiver import *
+import DeepRx_model
+import DeepRx_port as pD
 parser = argparse.ArgumentParser()
 parser.add_argument('--model', type = str, default = 'Resnet34')
 parser.add_argument('--gpu_list',  type = str,  default='6,7', help='input gpu list')
@@ -23,13 +25,12 @@ parser.add_argument('--mode',  type = int,  default= 0, help='input mode')
 parser.add_argument('--SNR',  type = int,  default= -1, help='input mode')
 parser.add_argument('--lr',  type = float,  default= 1e-3, help='input mode')
 parser.add_argument('--freeze_CE',  type = int,  default= 1)
-parser.add_argument('--freeze_SD',  type = int,  default= 1)
+parser.add_argument('--freeze_SD',  type = int,  default= 0)
 parser.add_argument('--load_CE',  type = int,  default= 1)
 parser.add_argument('--load_SD',  type = int,  default= 1)
-parser.add_argument('--load_CE2',  type = int,  default= 0)
+parser.add_argument('--load_CE2',  type = int,  default= 1)
 args = parser.parse_args()
 
-print(args.freeze_CE, args.load_CE, args.load_SD)
 
 # Parameters for training
 learning_rate = args.lr  # bigger to train faster
@@ -62,8 +63,8 @@ lr_threshold = 1e-6
 lr_freq = 10
 num_workers = 16
 print_freq = 100
-Pilot_num = 8
-best_nmse = 0.1515
+Pilot_num = 32
+best_nmse = 1
 
 # channel data for training and validation
 data1 = open('/data/CuiMingyao/AI_competition/OFDMReceiver/H.bin','rb')
@@ -99,20 +100,19 @@ CNN = torch.nn.DataParallel( CNN ).cuda()  # model.module
 # FC = FC.cuda()
 # CNN = CNN.cuda()
 
-SD = XYH2X_ResNet18()
-if args.load_SD:
-    SD_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/XYH2X_Resnet18_SD_mode'+str(mode)+'_Pilot'+str(Pilot_num)+'.pth.tar'                
-    SD.load_state_dict(torch.load(SD_path)['state_dict'])
-    print("Weight For SD PD Loaded!")
-SD = torch.nn.DataParallel( SD ).cuda()  # model.module
+# SD_path = '/home/hjiang/AI second part/Modelsave0_p'+str(Pilot_num)+'/Rhy5_f4_'
+SD_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/HS_SD_Pilot32'
+SD = pD.DeepRx(SD_path, cuda_gpu=True, gpus= [0,1])              
+print("Weight For SD Loaded!")
 # SD = SD.cuda()
 
 
 CE2 = XDH2H_Resnet()
 if args.load_CE2:
-    CE2_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/XDH2H_'+str(args.model)+'_CE2_mode'+str(mode)+'_Pilot'+str(Pilot_num)+'.pth.tar'                
+    # CE2_path = '/home/wxh/AI_wireless_communication/Modelsave/FeedbackCE_Pilot32_mode0_(0.0374).pth.tar'
+    CE2_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/XDH2H_'+str(args.model)+'_CE2_mode'+str(mode)+'_Pilot'+str(Pilot_num)+'_withSD.pth.tar'
     CE2.load_state_dict(torch.load(CE2_path)['state_dict'])
-    print("Weight For SD PD Loaded!")
+    print("Weight For CE2 Loaded!")
 CE2 = torch.nn.DataParallel( CE2 ).cuda()  # model.module
 
 if args.freeze_CE == 1:
@@ -125,17 +125,24 @@ if args.freeze_CE == 1:
     CNN.eval()
 
 if args.freeze_SD == 1:
-    for params in SD.parameters():
-        SD.requires_grad = False
+    for params in SD[0].parameters():
+        SD[0].requires_grad = False
+    for params in SD[1].parameters():   
+        SD[1].requires_grad = False
     print('freeze SD channel estimation!')
-    SD.eval()
+    SD[0].eval()
+    SD[1].eval()
+
+
 
 if args.freeze_CE == 0:
     optimizer_FC = torch.optim.Adam(FC.parameters(), lr=learning_rate)
     optimizer_CNN = torch.optim.Adam(CNN.parameters(), lr=learning_rate)
 
 if args.freeze_SD == 0:
-    optimizer_SD = torch.optim.Adam(SD.parameters(), lr=learning_rate)
+    optimizer_SD = []
+    optimizer_SD.append(torch.optim.Adam(SD[0].parameters(), lr=learning_rate))
+    optimizer_SD.append(torch.optim.Adam(SD[1].parameters(), lr=learning_rate))
 
 optimizer_CE2 = torch.optim.Adam(CE2.parameters(), lr=learning_rate)
 
@@ -165,15 +172,18 @@ for epoch in range(epochs):
         CNN.eval()
 
     if args.freeze_SD == 0:
-        SD.train()
+        SD[0].train()
+        SD[1].train()
     else:
-        SD.eval()
+        SD[0].eval()
+        SD[1].eval()
 
     for it, (Y_train, X_train, H_train) in enumerate(train_dataloader):
         
         optimizer_CE2.zero_grad()
         if args.freeze_SD == 0:
-            optimizer_SD.zero_grad()
+            optimizer_SD[0].zero_grad()
+            optimizer_SD[1].zero_grad()
         if args.freeze_CE == 0:
             optimizer_FC.zero_grad()
             optimizer_CNN.zero_grad()
@@ -221,18 +231,10 @@ for epoch in range(epochs):
         以上
         '''
 
-        # ML 初步估计
-        X_LS = get_LS(Yd_input_train, H_train_padding.detach().cpu())
-        
-        X_input_train = torch.zeros([batch_size, 2, 2, 256], dtype = torch.float32)
-        X_input_train[:,0,:,:] = torch.tensor(X_LS.real, dtype = torch.float32)
-        X_input_train[:,1,:,:] = torch.tensor(X_LS.imag, dtype = torch.float32)
-        
-        input3 = torch.cat([X_input_train.cuda(), Yp_input_train.cuda(), Yd_input_train.cuda(), H_train_padding], 2)
 
         # 第三层网络的输出
-        output3 = SD(input3)
-
+        output3 = pD.Pred_DeepRX(SD, torch.reshape(H_train_padding, [-1, 2,2,2,256]), Yd_input_train.cuda())
+        loss1 = criterion_SD(output3, X_train.float().cuda())
         # X_refine_train = ((output3 > 0.5)*2. - 1)/np.sqrt(2)
     
         # 第四层网络输入, X,Yd,H_train_padding
@@ -245,7 +247,12 @@ for epoch in range(epochs):
         output4 = output4.reshape(batch_size, 2, 4, 32)
         # 计算loss
         # label = X_train.float().cuda()
-        loss = criterion_CE(output4, Ht_train_label.cuda())
+        
+        loss2 = criterion_CE(output4, Ht_train_label.cuda())
+        if args.freeze_SD == 0:
+            loss = loss1 + loss2
+        else:
+            loss = loss2
         loss.backward()
         
         optimizer_CE2.step()
@@ -253,7 +260,8 @@ for epoch in range(epochs):
             optimizer_FC.step()
             optimizer_CNN.step()
         if args.freeze_SD == 0:
-            optimizer_SD.step()  
+            optimizer_SD[0].step()
+            optimizer_SD[1].step()
 
         if it % print_freq == 0:
             # print(nmse)
@@ -268,18 +276,21 @@ for epoch in range(epochs):
                 optimizer_FC.param_groups[0]['lr'] =  optimizer_FC.param_groups[0]['lr'] * 0.5
                 optimizer_CNN.param_groups[0]['lr'] =  optimizer_CNN.param_groups[0]['lr'] * 0.5
             if args.freeze_SD == 0:
-                optimizer_SD.param_groups[0]['lr'] =  optimizer_SD.param_groups[0]['lr'] * 0.5
-
+                optimizer_SD[0].param_groups[0]['lr'] =  optimizer_SD[0].param_groups[0]['lr'] * 0.5
+                optimizer_SD[1].param_groups[0]['lr'] =  optimizer_SD[1].param_groups[0]['lr'] * 0.5
+        
         if optimizer_CE2.param_groups[0]['lr'] < lr_threshold:
             optimizer_CE2.param_groups[0]['lr'] = lr_threshold
             if args.freeze_CE == 0:
                 optimizer_FC.param_groups[0]['lr'] =  lr_threshold
                 optimizer_CNN.param_groups[0]['lr'] =  lr_threshold
             if args.freeze_SD == 0:
-                optimizer_SD.param_groups[0]['lr'] =  lr_threshold
+                optimizer_SD[0].param_groups[0]['lr'] =  lr_threshold
+                optimizer_SD[1].param_groups[0]['lr'] =  lr_threshold
 
 
-    SD.eval()
+    SD[0].eval()
+    SD[1].eval()
     FC.eval()
     CNN.eval()
     CE2.eval()
@@ -329,20 +340,8 @@ for epoch in range(epochs):
             H_test_padding = H_test_padding.permute(0,3,1,2).contiguous() #df1为对应的频域形式，维度为Batch*2*4*256
 
 
-            # ML 初步估计
-            # X_LS, X_bits = get_ML(Yd_input_test, H_test_padding.detach().cpu().numpy())
-
-            X_LS = get_LS(Yd_input_test, H_test_padding.detach().cpu())
-            X_input_test = torch.zeros([Ns, 2, 2, 256], dtype = torch.float32)
-            X_input_test[:,0,:,:] = torch.tensor(X_LS.real, dtype = torch.float32)
-            X_input_test[:,1,:,:] = torch.tensor(X_LS.imag, dtype = torch.float32)
- 
-
-            
-            input3 = torch.cat([X_input_test.cuda(), Yp_input_test.cuda(), Yd_input_test.cuda(), H_test_padding], 2)
-
             # 第三层网络的输出
-            output3 = SD(input3)
+            output3 = pD.Pred_DeepRX(SD, torch.reshape(H_test_padding, [-1, 2,2,2,256]), Yd_input_test.cuda())
 
             # X_refine_test = ((output3 > 0.5)*2. - 1)/np.sqrt(2)
             
@@ -366,15 +365,20 @@ for epoch in range(epochs):
             print('CE2 NMSE:%.4f' % nmse2)
             if nmse2 < best_nmse:
                 # model save
-                CE2Save = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/XDH2H_'+str(args.model)+'_CE2_mode'+str(mode)+'_Pilot'+str(Pilot_num)+'.pth.tar'                
-                torch.save({'state_dict': CE2.module.state_dict(), }, CE2Save, _use_new_zipfile_serialization=False)
-                print('CE2 Model saved!')
+
 
 
                 if args.freeze_SD == 0:
-                    SDSave = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/XYH2X_' + args.model + '_SD_mode'+str(mode)+'_Pilot'+str(Pilot_num)+'.pth.tar'                
-                    torch.save({'state_dict': SD.module.state_dict(), }, SDSave,_use_new_zipfile_serialization=False)
+                    CE2Save = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/XDH2H_'+str(args.model)+'_CE2_mode'+str(mode)+'_Pilot'+str(Pilot_num)+'_withSD.pth.tar'                
+                    torch.save({'state_dict': CE2.module.state_dict(), }, CE2Save, _use_new_zipfile_serialization=False)
+                    print('CE2 Model saved!')   
+                    
+                    DeepRx_model.Save_Model(SD, 2, '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/HS_SD_Pilot32')
                     print('SD Model saved!')
+                else:
+                    CE2Save = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/XDH2H_'+str(args.model)+'_CE2_mode'+str(mode)+'_Pilot'+str(Pilot_num)+'_woSD.pth.tar'                
+                    torch.save({'state_dict': CE2.module.state_dict(), }, CE2Save, _use_new_zipfile_serialization=False)
+                    print('CE2 Model saved!')   
                 
                 if args.freeze_CE == 0:
                     FCSave =  '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/FC_CE_Pilot'+ str(Pilot_num)+'_mode' + str(mode) + '.pth.tar'

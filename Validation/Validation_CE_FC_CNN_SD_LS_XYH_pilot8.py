@@ -8,21 +8,19 @@ import h5py
 from scipy.io import loadmat
 from scipy.io import savemat
 import time
-from Model_define_pytorch import NMSELoss, FC_ELU_Estimation,CE_ResNet18,XYH2X_ResNet18,XDH2H_Resnet
-from Densenet_SD import DenseNet100, DenseNet121,DenseNet201
+from Model_define_pytorch import NMSELoss, FC_ELU_Estimation,CE_ResNet18,XYH2X_ResNet18, XYH2X_ResNet34
 from generate_data import *
 import argparse
 from torch.optim import lr_scheduler
 from torch.utils.data import Dataset, DataLoader
-from MLreceiver_wo_print import *
 from LSreveiver import *
-from SoftMLreceiver import SoftMLReceiver
+from MLreceiver import *
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--model', type = str, default = 'Resnet34')
 parser.add_argument('--gpu_list',  type = str,  default='6,7', help='input gpu list')
 parser.add_argument('--mode',  type = int,  default= 0, help='input mode')
 parser.add_argument('--SNR',  type = int,  default= -1, help='input mode')
-
 args = parser.parse_args()
 
 
@@ -32,11 +30,14 @@ mode = args.mode
 gpu_list = args.gpu_list
 os.environ["CUDA_VISIBLE_DEVICES"] = gpu_list
 
+
 def get_ML(Yd_input, Hf):
     Yd = np.array(Yd_input[:,0,:,:] + 1j*Yd_input[:,1,:,:])
     Hf = Hf[:,0,:,:] + 1j*Hf[:,1,:,:] 
     Hf = np.reshape(Hf, [-1,2,2,256], order = 'F')
     X_ML, X_bits = MLReceiver(Yd, Hf)
+    X_ML.real = (X_ML.real > 0)*2 - 1
+    X_ML.imag = (X_ML.imag > 0)*2 - 1
     return X_ML, X_bits
 
 def get_LS(Yd_input, Hf):
@@ -48,24 +49,21 @@ def get_LS(Yd_input, Hf):
     X_LS.imag = (X_LS.imag > 0)*2 - 1
     return X_LS
 
-
 batch_size = 2000
 epochs = 300
 
-
+lr_threshold = 1e-6
+lr_freq = 15
 num_workers = 16
 print_freq = 100
 Pilot_num = 8
+best_accuracy = 0.5
 
 
-# 加载用于测试的接收数据 Y shape=[batch*2048]
-# if Pilot_num == 32:
-#     Y = np.loadtxt('/data/CuiMingyao/AI_competition/OFDMReceiver/Y_1.csv', dtype=np.float32,delimiter=',')
-
-# if Pilot_num == 8:
-#     Y = np.loadtxt('/data/CuiMingyao/AI_competition/OFDMReceiver/Y_2.csv', dtype=np.float32,delimiter=',')
-d = np.load('evaluation.npy', allow_pickle=True).item()
-Y = d['y']
+data2 = open('/data/CuiMingyao/AI_competition/OFDMReceiver/H_val.bin','rb')
+H2 = struct.unpack('f'*2*2*2*32*2000,data2.read(4*2*2*2*32*2000))
+H2 = np.reshape(H2,[2000,2,4,32])
+H_val = H2[:,1,:,:]+1j*H2[:,0,:,:]   # time-domain channel for training
 
 # Model load for channel estimation
 ##### model construction for channel estimation #####
@@ -85,37 +83,31 @@ state_dicts = torch.load(path)
 FC.load_state_dict(state_dicts['fc'])
 CNN.load_state_dict(state_dicts['cnn'])
 print("Model for CE has been loaded!")
-# FC = torch.nn.DataParallel( FC ).cuda()  # model.module
-# CNN = torch.nn.DataParallel( CNN ).cuda()  # model.module
 
 
-SD = XYH2X_ResNet18()
 
-SD_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/XYH2X_Resnet18_SD_mode'+str(mode)+'_Pilot'+str(Pilot_num)+'.pth.tar'                
+if args.model == 'Resnet18':
+    SD = XYH2X_ResNet18()
+elif args.model == 'Resnet34':
+    SD = XYH2X_ResNet34()
+
+if 'Resnet' in args.model:
+    SD_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/XYH2X_' + args.model + '_SD_mode'+str(mode)+'_Pilot'+str(Pilot_num)+'.pth.tar'
+else:
+    SD_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/XYH2X_Unet_SD_mode'+str(mode)+'_Pilot'+str(Pilot_num)+'.pth.tar' 
 SD.load_state_dict(torch.load(SD_path)['state_dict'])
 print("Weight For SD PD Loaded!")
-# SD = torch.nn.DataParallel( SD ).cuda()  # model.module
-# SD = SD.cuda()
 
-
-CE2 = XDH2H_Resnet()
-
-CE2_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/XDH2H_'+str(args.model)+'_CE2_mode'+str(mode)+'_Pilot'+str(Pilot_num)+'.pth.tar'                
-CE2.load_state_dict(torch.load(CE2_path)['state_dict'])
-print("Weight For SD PD Loaded!")
-# CE2 = torch.nn.DataParallel( CE2 ).cuda()  # model.module
+criterion_CE =  NMSELoss()
+criterion_SD =  torch.nn.BCELoss(weight=None, reduction='mean')
 
 
 
 
+test_dataset  = RandomDataset(H_val,Pilot_num=Pilot_num,SNRdb=SNRdb,mode=mode)
+test_dataloader = DataLoader(dataset = test_dataset, batch_size = batch_size, shuffle = False, num_workers = num_workers, drop_last = True, pin_memory = True)
 
-
-
-
-
-Y = torch.tensor(Y)
-X_bits = []
-print('==========Begin Testing=========')
+print('==========Begin Training=========')
 iter = 0
 
 
@@ -123,11 +115,20 @@ iter = 0
 SD.eval()
 FC.eval()
 CNN.eval()
-CE2.eval()
 with torch.no_grad():
-    for i in range(5):
-        Y_test = Y[i*2000 : (i+1)*2000, :]
+    for Y_test, X_test, H_test in test_dataloader:
         Ns = Y_test.shape[0]
+
+        # 真实的频域信道，获取标签
+        Hf_test = np.fft.fft(np.array(H_test), 256)/20 # 4*256
+        Hf_test_label = torch.zeros([Ns, 2, 4, 256], dtype=torch.float32)
+        Hf_test_label[:, 0, :, :] = torch.tensor(Hf_test.real, dtype = torch.float32)
+        Hf_test_label[:, 1, :, :] = torch.tensor(Hf_test.imag, dtype = torch.float32)
+        # 真实的时域信道，获取标签
+        Ht_test_label = torch.zeros([Ns, 2, 4, 32], dtype=torch.float32)
+        Ht_test_label[:, 0, :, :] = H_test.real.float()
+        Ht_test_label[:, 1, :, :] = H_test.imag.float()
+
 
 
         # 接收数据与接收导频划分
@@ -142,8 +143,13 @@ with torch.no_grad():
         # 第一层网络输出
         output1 = FC(input1)
 
+
         # 第二层网络输入预处理
         output1 = output1.reshape(Ns, 2, 4, 256)
+
+        nmse1 = criterion_CE(output1.detach().cpu(), Hf_test_label)
+        print('The first layer nmse in frequency domain:',nmse1)
+
         input2 = torch.cat([Yd_input_test, Yp_input_test, output1], 2)
 
         # 第二层网络的输出
@@ -151,73 +157,79 @@ with torch.no_grad():
 
         #第三层网络输入预处理
         H_test_padding = output2.reshape(Ns, 2, 4, 32)
+
+        nmse2 = criterion_CE(H_test_padding.detach().cpu(), Ht_test_label)
+        print('The second layer nmse in time domain:',nmse2)
+
         H_test_padding = torch.cat([H_test_padding, torch.zeros(Ns,2,4,256-32, requires_grad=True)],3)
         H_test_padding = H_test_padding.permute(0,2,3,1)
 
         H_test_padding = torch.fft(H_test_padding, 1)/20
         H_test_padding = H_test_padding.permute(0,3,1,2).contiguous() #df1为对应的频域形式，维度为Batch*2*4*256
 
+        nmse3 = criterion_CE(H_test_padding.detach().cpu(), Hf_test_label)
+        print('The second layer nmse in frequency domain:',nmse3)
 
         # ML 初步估计
-        # X_LS, _ = get_ML(Yd_input_test, H_test_padding.detach().cpu().numpy())
-
         X_LS = get_LS(Yd_input_test, H_test_padding.detach().cpu())
+        X_ML, X_bits = get_ML(Yd_input_test, H_test_padding.detach().cpu())
+
+        eps = 0.1
+        # ML性能
+        error2 = np.abs(X_bits - X_test.numpy())
+        accuracy2 = np.sum(error2 < eps)/error2.size
+
+        print('ML accuracy %.4f' % accuracy2)
+
+
+        # LS + CNN 性能
         X_input_test = torch.zeros([Ns, 2, 2, 256], dtype = torch.float32)
         X_input_test[:,0,:,:] = torch.tensor(X_LS.real, dtype = torch.float32)
         X_input_test[:,1,:,:] = torch.tensor(X_LS.imag, dtype = torch.float32)
 
 
-        
         input3 = torch.cat([X_input_test, Yp_input_test, Yd_input_test, H_test_padding], 2)
 
         # 第三层网络的输出
         output3 = SD(input3)
 
-        # X_refine_test = ((output3 > 0.5)*2. - 1)/np.sqrt(2)
-        
-        output3 = output3.reshape([Ns,2,256,2])
-        output3 = output3.permute(0,3,1,2).contiguous()
-
-        # input4 = torch.cat([X_input_test, Yd_input_test, H_test_padding], 2)
-        input4 = torch.cat([output3, Yd_input_test, H_test_padding], 2)
-
-        output4 = CE2(input4)
-        output4 = output4.reshape(Ns, 2, 4, 32)
-        # 计算loss
+        label = X_test.float().numpy()
+        output3 = (output3 > 0.5)*1.
+        output3 = output3.cpu().detach().numpy()
 
 
-        H_test_padding2 = output4
-        H_test_padding2 = torch.cat([H_test_padding2, torch.zeros(Ns,2,4,256-32, requires_grad=True)],3)
-        H_test_padding2 = H_test_padding2.permute(0,2,3,1)
+        error = np.abs(output3 - label)
+        average_accuracy = np.sum(error < eps) / error.size
 
-        H_test_padding2 = torch.fft(H_test_padding2, 1)/20
-        H_test_padding2 = H_test_padding2.permute(0,3,1,2).contiguous() #df1为对应的频域形式，维度为Batch*2*4*256
+        print('LS+XYH2X accuracy %.4f' % average_accuracy)
 
 
-        # ML性能对比
-        Yd = np.array(Yd_input_test[:,0,:,:] + 1j*Yd_input_test[:,1,:,:])
+        # ML+CNN 性能
+        X_input_test = torch.zeros([Ns, 2, 2, 256], dtype = torch.float32)
+        X_input_test[:,0,:,:] = torch.tensor(X_ML.real, dtype = torch.float32)
+        X_input_test[:,1,:,:] = torch.tensor(X_ML.imag, dtype = torch.float32)
 
 
-        Hf2 = H_test_padding2.detach().cpu().numpy()
-        Hf2 = Hf2[:,0,:,:] + 1j*Hf2[:,1,:,:] 
-        Hf2 = np.reshape(Hf2, [-1,2,2,256], order = 'F')
+        input3 = torch.cat([X_input_test, Yp_input_test, Yd_input_test, H_test_padding], 2)
+
+        # 第三层网络的输出
+        output3 = SD(input3)
+
+        label = X_test.float().numpy()
+        output3 = (output3 > 0.5)*1.
+        output3 = output3.cpu().detach().numpy()
+
+        eps = 0.1
+        error = np.abs(output3 - label)
+        average_accuracy = np.sum(error < eps) / error.size
+
+        print('ML+XYH2X accuracy %.4f' % average_accuracy)
 
 
 
-        X_SoftML, X_SoftMLbits = SoftMLReceiver(Yd, Hf2, SNRdb = 5)
-
-        X_bits.append(X_SoftMLbits)
-
-        print('Love live')
-
-X_bits = np.concatenate(X_bits , axis = 0 )
-
-if Pilot_num == 32:
-    X_1 = np.array(np.floor(X_bits + 0.5), dtype=np.bool)
-    X_1.tofile('./X_pre_1_CE_FC_CNN_SD_XYH2X_Resnet18_CE2_' + str(args.model)+ '.bin')
+print('Lovelive')
 
 
-if Pilot_num == 8:
-    X_1 = np.array(np.floor(X_bits + 0.5), dtype=np.bool)
-    X_1.tofile('./X_pre_2_CE_FC_CNN_SD_XYH2X_Resnet18_CE2_' + str(args.model)+ '.bin')
-            
+
+
+

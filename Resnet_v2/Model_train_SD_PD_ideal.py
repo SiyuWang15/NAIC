@@ -17,7 +17,7 @@ from torch.utils.data import Dataset, DataLoader
 parser = argparse.ArgumentParser()
 parser.add_argument('--model', type = str, default = 'Resnet18')
 parser.add_argument('--load_flag', type = bool, default = False)
-parser.add_argument('--gpu_list',  type = str,  default='6,7', help='input gpu list')
+parser.add_argument('--gpu_list',  type = str,  default='4,5', help='input gpu list')
 parser.add_argument('--mode',  type = int,  default= 0, help='input mode')
 parser.add_argument('--lr',  type = float,  default= 1e-3, help='input mode')
 args = parser.parse_args()
@@ -38,7 +38,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = gpu_list
 # SEED = 66
 # seed_everything(SEED)
 
-batch_size = 512
+batch_size = 256
 epochs = 200
 
 lr_threshold = 1e-5
@@ -83,7 +83,8 @@ else:
 
 if load_flag:
     if 'Resnet' in args.model:
-        model_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/PD_' + args.model + '_SD_mode'+str(mode)+'.pth.tar'
+        # model_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/PD_' + args.model + '_SD_mode'+str(mode)+'.pth.tar'
+        model_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/SD4PerfectH.pth.tar'
     else:
         model_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/PD_Unet_SD_mode'+str(mode)+'.pth.tar'
     model.load_state_dict(torch.load(model_path)['state_dict'])
@@ -181,14 +182,14 @@ for epoch in range(epochs):
             average_accuracy = np.sum(error < eps) / error.size
 
             print('accuracy %.4f' % average_accuracy)
-            if average_accuracy > best_accuracy:
-                # model save
-                if 'Resnet' in args.model:
-                    modelSave = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/PD_' + args.model + '_SD_mode'+str(mode)+'.pth.tar'
-                else:
-                    modelSave =  '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/PD_Unet_SD_mode'+str(mode)+'.pth.tar'        
+            # if average_accuracy > best_accuracy:
+            #     # model save
+            #     if 'Resnet' in args.model:
+            #         modelSave = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/PD_' + args.model + '_SD_mode'+str(mode)+'.pth.tar'
+            #     else:
+            #         modelSave =  '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/PD_Unet_SD_mode'+str(mode)+'.pth.tar'        
                 
-                torch.save({'state_dict': model.module.state_dict(), }, modelSave,_use_new_zipfile_serialization=False)
-                print('Model saved!')
-                best_accuracy = average_accuracy
+            #     torch.save({'state_dict': model.module.state_dict(), }, modelSave,_use_new_zipfile_serialization=False)
+            #     print('Model saved!')
+            #     best_accuracy = average_accuracy
             

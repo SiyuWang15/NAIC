@@ -23,7 +23,7 @@ def SoftMLReceiver_single_process(q, label, Y, H, SNRdb = 10):
     # 输出：
     # X_ML : frequency domain 复数 (batch * 2 * 256) [样本数 * 发射天线数 * 子载波数]
     # X_bits    : frequency domain 比特 (batch * 1024) 
-    # X_conf : 置信度，维度(batch*2*2*256)[样本数 * 虚实部 * 发射天线数 * 子载波数]
+
 
     
     codebook = MakeCodebook()
@@ -37,7 +37,6 @@ def SoftMLReceiver_single_process(q, label, Y, H, SNRdb = 10):
     H = np.reshape(H , (batch, 2,  2, 256))
     X_ML = np.zeros((batch, 2, 256) , dtype = complex)
     X_bits = np.zeros((batch, 2, 2, 256))
-    X_conf = np.zeros((batch, 2, 2, 256))
 
     index = [0,1,2,3]
 
@@ -45,13 +44,14 @@ def SoftMLReceiver_single_process(q, label, Y, H, SNRdb = 10):
 
     sigma2 = 0.35 * 10 ** (-SNRdb / 10)
     for num in range(batch):
+        if num % 100 == 0:
+            print('Completed batches [%d]/[%d]'%(num ,batch), time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
         for idx in range(256):
             y = Y[num, :, idx:idx+1]
             h = H[num, :, :, idx]
             error = np.zeros((2**G, 1)) 
             x_complex = np.zeros( (2, 1) , dtype = complex)
             x_bit = np.zeros((4,1))
-            x_conf = np.zeros((4,1))
             # 码字遍历
             for idx1 in range(2**G):
                 x = np.zeros( (2, 1) , dtype = complex)    
@@ -75,7 +75,6 @@ def SoftMLReceiver_single_process(q, label, Y, H, SNRdb = 10):
 
                 LR0 = np.sum(np.exp( - error[ code_idx < 0.5 ]/sigma2 ))
                 LR1 = np.sum(np.exp( - error[ code_idx > 0.5 ]/sigma2 ))
-                x_conf[idx2] = LR1 / (LR0 + LR1)
                 if LR0 > LR1:
                     x_bit[idx2] = 0.
                 else:
@@ -89,17 +88,13 @@ def SoftMLReceiver_single_process(q, label, Y, H, SNRdb = 10):
             # x_complex = 0.7071 * ( 2 * bits[:,0] - 1 ) + 0.7071j * ( 2 * bits[:,1] - 1 )
             # x_complex = x_complex.reshape([2,1])
             X_ML[num,:,idx:idx+1] = x_complex 
-            X_conf[num, 0, 0, idx] = x_conf[0]  #实部，第一根天线
-            X_conf[num, 1, 0, idx] = x_conf[1]  #虚部，第一根天线
-            X_conf[num, 0, 1, idx] = x_conf[2]  #实部，第二根天线
-            X_conf[num, 1, 1, idx] = x_conf[3]  #虚部，第二根天线
 
     X_bits = np.reshape(X_ML, [batch, 2 , 256, 1])
     X_bits = np.concatenate([np.real(X_bits)>0,np.imag(X_bits)>0], 3)*1
     X_bits = np.reshape(X_bits, [batch, 1024])
 
-    q[label] = (X_ML, X_bits, X_conf)
-
+    q[label] = (X_ML, X_bits)
+    print('P{0} completed!'.format(label))
 
 def SoftMLReceiver(Y, H, Codebook = MakeCodebook(4), SNRdb = 10, num_workers = 16):
     # 输入：
@@ -145,19 +140,17 @@ def SoftMLReceiver(Y, H, Codebook = MakeCodebook(4), SNRdb = 10, num_workers = 1
 
     X_ML = np.zeros((N_s, 2, 256) , dtype = complex)
     X_bits = np.zeros((N_s, 1024))
-    X_conf = np.zeros((N_s, 2, 2, 256))
     
     for label,v in q.items():
-        ml, bits, conf = v
+        ml, bits = v
         if label < num_workers - 1:
             X_ML[  label*batch : (label+1)*batch, :, :] = ml
             X_bits[  label*batch : (label+1)*batch, :] = bits
-            X_conf[  label*batch : (label+1)*batch, : , :, :] = conf
         else:
             X_ML[  label*batch: , :, :] = ml
             X_bits[  label*batch: , :] = bits
-            X_conf[  label*batch: , :, :, :] = conf
-    return X_ML, X_bits, X_conf
+
+    return X_ML, X_bits
 
 if __name__ == '__main__':
 

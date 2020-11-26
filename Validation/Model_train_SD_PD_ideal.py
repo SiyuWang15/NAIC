@@ -8,7 +8,7 @@ import h5py
 from scipy.io import loadmat
 from scipy.io import savemat
 import time
-from Model_define_pytorch import  NMSELoss, DatasetFolder,  ResNet, U_Net, ResNet34, ResNet18, ResNet50
+from Model_define_pytorch_SD_PD import NMSELoss, DatasetFolder, ResNet, U_Net, ResNet34, ResNet18, ResNet50
 from generate_data import *
 import argparse
 from torch.optim import lr_scheduler
@@ -38,16 +38,14 @@ os.environ["CUDA_VISIBLE_DEVICES"] = gpu_list
 # SEED = 66
 # seed_everything(SEED)
 
-batch_size = 512
-epochs = 100
+batch_size = 256
+epochs = 200
 
 lr_threshold = 1e-5
-lr_freq = 10
+lr_freq = 20
 
 num_workers = 16
-print_freq = 100
-val_freq = 100
-iterations = 10000
+print_freq = 30
 Pilotnum = 8
 mode = args.mode # 0,1,2,-1
 SNRdB = -1
@@ -75,26 +73,23 @@ elif args.model == 'Resnet50':
     model = ResNet50()
 else:
     model = U_Net()
-
-
 criterion =  torch.nn.BCELoss(weight=None, reduction='mean')
 
 
-
-
-
-if load_flag:
-    if 'Resnet' in args.model:
-        model_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/' + args.model + '_SD_mode'+str(mode)+'_ideal.pth.tar'
-        # model_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/SD4PerfectH.pth.tar'
-    else:
-        model_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/Unet_SD_mode'+str(mode)+'.pth.tar'
-    model.load_state_dict(torch.load(model_path)['state_dict'])
-    print("Weight Loaded!")
 if len(gpu_list.split(',')) > 1:
     model = torch.nn.DataParallel(model).cuda() # model.module
 else:
     model = model.cuda()
+
+if load_flag:
+    if 'Resnet' in args.model:
+        # model_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/PD_' + args.model + '_SD_mode'+str(mode)+'.pth.tar'
+        model_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/SD4PerfectH.pth.tar'
+    else:
+        model_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/PD_Unet_SD_mode'+str(mode)+'.pth.tar'
+    model.load_state_dict(torch.load(model_path)['state_dict'])
+    print("Weight Loaded!")
+
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
 # test_data = generator(2000,H_tra,Pilotnum)
@@ -117,17 +112,17 @@ for epoch in range(epochs):
         
         Y_input_train = np.reshape(Y_train, [batch_size, 2, 2, 2, 256], order='F')
         Y_input_train = Y_input_train.float()
-        Y_input_train = Y_input_train[:,:,1,:,:]   # 取出接收数据信号，实部虚部*2*256
-
+        Yd_input_train = Y_input_train[:,:,1,:,:]   # 取出接收数据信号，实部虚部*2*256
+        Yp_input_train = Y_input_train[:,:,0,:,:]
         
         Hf_train = np.fft.fft(np.array(H_train), 256)/20 # 4*256
         H_input_train = torch.zeros([batch_size, 2, 4, 256], dtype=torch.float32)
         H_input_train[:, 0, :, :] = torch.tensor(Hf_train.real, dtype = torch.float32)
         H_input_train[:, 1, :, :] = torch.tensor(Hf_train.imag, dtype = torch.float32)
 
-        input = torch.cat([Y_input_train, H_input_train], 2)
+        input = torch.cat([Yp_input_train, Yd_input_train, H_input_train], 2)
         # input = torch.reshape(input, [batch_size, 2, 6*8, 32])
-        input = torch.reshape(input, [batch_size, 1, 12, 256])
+        input = torch.reshape(input, [batch_size, 1, 16, 256])
         input = input.cuda()
 
         label = X_train.float().cuda()
@@ -163,16 +158,17 @@ for epoch in range(epochs):
             
             Y_input_test = np.reshape(Y_test, [Ns, 2, 2, 2, 256], order='F')
             Y_input_test = Y_input_test.float()
-            Y_input_test = Y_input_test[:,:,1,:,:]   # 取出接收数据信号，实部虚部*2*256
+            Yd_input_test = Y_input_test[:,:,1,:,:]   # 取出接收数据信号，实部虚部*2*256
+            Yp_input_test = Y_input_test[:,:,0,:,:]
 
             Hf_test = np.fft.fft(np.array(H_test), 256)/20 # 4*256
             H_input_test = torch.zeros([Ns, 2, 4, 256], dtype=torch.float32)
             H_input_test[:, 0, :, :] = torch.tensor(Hf_test.real, dtype = torch.float32)
             H_input_test[:, 1, :, :] = torch.tensor(Hf_test.imag, dtype = torch.float32)
 
-            input = torch.cat([Y_input_test, H_input_test], 2)
+            input = torch.cat([Yp_input_test, Yd_input_test, H_input_test], 2)
             # input = torch.reshape(input, [Ns, 2, 6*8, 32])
-            input = torch.reshape(input, [Ns, 1, 12, 256])
+            input = torch.reshape(input, [Ns, 1, 16, 256])
             input = input.cuda()
 
             output = model(input)
@@ -186,14 +182,14 @@ for epoch in range(epochs):
             average_accuracy = np.sum(error < eps) / error.size
 
             print('accuracy %.4f' % average_accuracy)
-            if average_accuracy > best_accuracy:
-                # model save
-                if 'Resnet' in args.model:
-                    modelSave = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/' + args.model + '_SD_mode'+str(mode)+'_ideal.pth.tar'
-                else:
-                    modelSave =  '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/Unet_SD_mode'+str(mode)+'_ideal.pth.tar'        
-
-                torch.save({'state_dict': model.module.state_dict(), }, modelSave,_use_new_zipfile_serialization=False)
-                print('Model saved!')
-                best_accuracy = average_accuracy
+            # if average_accuracy > best_accuracy:
+            #     # model save
+            #     if 'Resnet' in args.model:
+            #         modelSave = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/PD_' + args.model + '_SD_mode'+str(mode)+'.pth.tar'
+            #     else:
+            #         modelSave =  '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/PD_Unet_SD_mode'+str(mode)+'.pth.tar'        
+                
+            #     torch.save({'state_dict': model.module.state_dict(), }, modelSave,_use_new_zipfile_serialization=False)
+            #     print('Model saved!')
+            #     best_accuracy = average_accuracy
             

@@ -16,7 +16,9 @@ from torch.optim import lr_scheduler
 from torch.utils.data import Dataset, DataLoader
 from MLreceiver_wo_print import *
 from LSreveiver import *
-from SoftMLreceiver import SoftMLReceiver
+from SoftMLreceiver_wo_print import SoftMLReceiver
+import DeepRx_port as pD
+import DeepRx_model
 parser = argparse.ArgumentParser()
 parser.add_argument('--model', type = str, default = 'Resnet34')
 parser.add_argument('--gpu_list',  type = str,  default='6,7', help='input gpu list')
@@ -25,7 +27,7 @@ parser.add_argument('--SNR',  type = int,  default= -1, help='input mode')
 
 args = parser.parse_args()
 
-
+use_gpu = True
 # Parameters for training
 SNRdb = args.SNR
 mode = args.mode
@@ -87,26 +89,32 @@ print("Model for CE has been loaded!")
 # FC = torch.nn.DataParallel( FC ).cuda()  # model.module
 # CNN = torch.nn.DataParallel( CNN ).cuda()  # model.module
 
-
-SD = XYH2X_ResNet18()
-
-SD_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/XYH2X_Resnet18_SD_mode'+str(mode)+'_Pilot'+str(Pilot_num)+'.pth.tar'                
-SD.load_state_dict(torch.load(SD_path)['state_dict'])
-print("Weight For SD PD Loaded!")
-# SD = torch.nn.DataParallel( SD ).cuda()  # model.module
-# SD = SD.cuda()
+if use_gpu:
+    # SD_path = '/home/hjiang/AI second part/Modelsave0_p'+str(Pilot_num)+'/Rhy5_f4_'
+    SD_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/HS_SD_Pilot8' 
+    SD = pD.DeepRx(SD_path,cuda_gpu=True,gpus=[0,1])        
+else:
+    SD_path = '/home/hjiang/AI second part/Modelsave0_p'+str(Pilot_num)+'/Rhy5_f4_cpu'
+    SD = pD.DeepRx(SD_path,cuda_gpu=False,gpus=[0,1])    
+print("Weight For SD2 Loaded!")
 
 
 CE2 = XDH2H_Resnet()
 
-CE2_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/XDH2H_'+str(args.model)+'_CE2_mode'+str(mode)+'_Pilot'+str(Pilot_num)+'.pth.tar'                
-CE2.load_state_dict(torch.load(CE2_path)['state_dict'])
+# CE2_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/CE2_0.14927.pth'
+# CE2_path ='/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/XDH2H_'+str(args.model)+'_CE2_mode'+str(mode)+'_Pilot'+str(Pilot_num)+'_withSD.pth.tar'  
+CE2_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/CE2_SD_0.14486.pth'  
+state_dicts = torch.load(CE2_path)
+# CE2.load_state_dict(state_dicts['statedict'])    
+CE2 = torch.nn.DataParallel( CE2 ).cuda()      
+CE2.load_state_dict(state_dicts['CE2'])
 print("Weight For SD PD Loaded!")
-# CE2 = torch.nn.DataParallel( CE2 ).cuda()  # model.module
 
 
 
-
+if use_gpu:
+    FC = torch.nn.DataParallel( FC ).cuda()  # model.module
+    CNN = torch.nn.DataParallel( CNN ).cuda()  # model.module
 
 
 criterion_CE =  NMSELoss()
@@ -119,12 +127,14 @@ H_test = torch.tensor(H_test)
 print('==========Begin Testing=========')
 iter = 0
 
+N = 5
 
-
-SD.eval()
+SD[0].eval()
+SD[1].eval()
 FC.eval()
 CNN.eval()
 CE2.eval()
+
 with torch.no_grad():
 
     # print('lr:%.4e' % optimizer_CE2.param_groups[0]['lr'])
@@ -152,92 +162,84 @@ with torch.no_grad():
     # 第一层网络输入
     input1 = Yp_input_test.reshape(Ns, 2*2*256) # 取出接收导频信号，实部虚部*2*256
     # 第一层网络输出
+    if use_gpu:
+        input1 = input1.cuda()
     output1 = FC(input1)
+    print('第一层')
 
     # 第二层网络输入预处理
     output1 = output1.reshape(Ns, 2, 4, 256)
-    input2 = torch.cat([Yd_input_test, Yp_input_test, output1], 2)
+    if use_gpu:
+        input2 = torch.cat([Yd_input_test.cuda(), Yp_input_test.cuda(), output1], 2)
+    else:
+        input2 = torch.cat([Yd_input_test, Yp_input_test, output1], 2)
 
     # 第二层网络的输出
     output2 = CNN(input2)
+    output2 = output2.reshape(Ns, 2, 4, 32)
+    print('第二层')
 
-    #第三层网络输入预处理
-    H_test_padding = output2.reshape(Ns, 2, 4, 32)
-    H_test_padding = torch.cat([H_test_padding, torch.zeros(Ns,2,4,256-32, requires_grad=True)],3)
-    H_test_padding = H_test_padding.permute(0,2,3,1)
+    start = output2
+    for idx in range(N):
+        #第三层网络输入预处理
+        H_test_padding = start.cpu()
+        H_test_padding = torch.cat([H_test_padding, torch.zeros(Ns,2,4,256-32, requires_grad=True)],3)
+        H_test_padding = H_test_padding.permute(0,2,3,1)
 
-    H_test_padding = torch.fft(H_test_padding, 1)/20
-    H_test_padding = H_test_padding.permute(0,3,1,2).contiguous() #df1为对应的频域形式，维度为Batch*2*4*256
+        H_test_padding = torch.fft(H_test_padding, 1)/20
+        H_test_padding = H_test_padding.permute(0,3,1,2).contiguous() #df1为对应的频域形式，维度为Batch*2*4*256
 
+        if use_gpu:
+            output3 = pD.Pred_DeepRX(SD, torch.reshape(H_test_padding.cuda(), [-1, 2,2,2,256]), Yd_input_test.cuda())
+        else:
+            output3 = pD.Pred_DeepRX(SD, torch.reshape(H_test_padding, [-1, 2,2,2,256]), Yd_input_test)
+        print('第三层')
+        # X_refine_test = ((output3 > 0.5)*2. - 1)/np.sqrt(2)
+        
+        X_1 = output3.reshape([Ns,2,256,2])
+        X_1 = X_1.permute(0,3,1,2).contiguous()
 
-    # ML 初步估计
-    # X_LS, X_bits = get_ML(Yd_input_test, H_test_padding.detach().cpu().numpy())
+        # 第四层网络的输入
+        if use_gpu:
+            input4 = torch.cat([X_1, Yd_input_test.cuda(), H_test_padding.cuda()], 2)
+        else:
+            input4 = torch.cat([X_1, Yd_input_test, H_test_padding], 2)
 
-    X_LS = get_LS(Yd_input_test, H_test_padding.detach().cpu())
-    X_input_test = torch.zeros([Ns, 2, 2, 256], dtype = torch.float32)
-    X_input_test[:,0,:,:] = torch.tensor(X_LS.real, dtype = torch.float32)
-    X_input_test[:,1,:,:] = torch.tensor(X_LS.imag, dtype = torch.float32)
+        output4 = CE2(input4)
+        output4 = output4.reshape(Ns, 2, 4, 32)
+        print('第四层')
 
+        #第五层网络输入预处理
+        end = output4
 
-    
-    input3 = torch.cat([X_input_test, Yp_input_test, Yd_input_test, H_test_padding], 2)
+        H_test_padding2 = end.cpu().detach()
+        H_test_padding2 = torch.cat([H_test_padding2, torch.zeros(Ns,2,4,256-32, requires_grad=True)],3)
+        H_test_padding2 = H_test_padding2.permute(0,2,3,1)
 
-    # 第三层网络的输出
-    output3 = SD(input3)
-
-    # X_refine_test = ((output3 > 0.5)*2. - 1)/np.sqrt(2)
-    
-    output3 = output3.reshape([Ns,2,256,2])
-    output3 = output3.permute(0,3,1,2).contiguous()
-
-    # input4 = torch.cat([X_input_test, Yd_input_test, H_test_padding], 2)
-    input4 = torch.cat([output3, Yd_input_test, H_test_padding], 2)
-
-    output4 = CE2(input4)
-    output4 = output4.reshape(Ns, 2, 4, 32)
-    # 计算loss
-    nmse1 = criterion_CE(output2.reshape(Ns, 2, 4, 32).detach().cpu(), Ht_test_label)
-    nmse1 = nmse1.numpy()
-    nmse2 = criterion_CE(output4.detach().cpu(), Ht_test_label)
-    nmse2 = nmse2.numpy()
-
-
-    # print('ML Accuracy:%.4f' % average_accuracy_ML, 'SD Accuracy:%.4f' % average_accuracy_SD)
-    print('CE1 NMSE:%.4f' % nmse1)
-    print('CE2 NMSE:%.4f' % nmse2)
-
-    H_test_padding2 = output4
-    H_test_padding2 = torch.cat([H_test_padding2, torch.zeros(Ns,2,4,256-32, requires_grad=True)],3)
-    H_test_padding2 = H_test_padding2.permute(0,2,3,1)
-
-    H_test_padding2 = torch.fft(H_test_padding2, 1)/20
-    H_test_padding2 = H_test_padding2.permute(0,3,1,2).contiguous() #df1为对应的频域形式，维度为Batch*2*4*256
+        H_test_padding2 = torch.fft(H_test_padding2, 1)/20
+        H_test_padding2 = H_test_padding2.permute(0,3,1,2).contiguous() #df1为对应的频域形式，维度为Batch*2*4*256
 
 
-    # ML性能对比
-    Yd = np.array(Yd_input_test[:,0,:,:] + 1j*Yd_input_test[:,1,:,:])
+        nmse = criterion_CE(output4.detach().cpu(), Ht_test_label)
+        nmse = nmse.numpy()
+        print('CE NMSE:%.4f' % nmse)
 
-    Hf1 = H_test_padding.detach().cpu().numpy()
-    Hf1 = Hf1[:,0,:,:] + 1j*Hf1[:,1,:,:] 
-    Hf1 = np.reshape(Hf1, [-1,2,2,256], order = 'F')
+        eps = 0.1
+        # ML性能对比
+        Yd = np.array(Yd_input_test[:,0,:,:] + 1j*Yd_input_test[:,1,:,:])
+
+        Hf2 = H_test_padding2.numpy()
+        Hf2 = Hf2[:,0,:,:] + 1j*Hf2[:,1,:,:] 
+        Hf2 = np.reshape(Hf2, [-1,2,2,256], order = 'F')
+
+        X_SoftML, X_SoftMLbits, _ = SoftMLReceiver(Yd, Hf2, SNRdb = 5)
+
+        error_SoftML = np.abs(X_SoftMLbits - X_test.numpy())
+        accuracy_SoftML = np.sum(error_SoftML < eps)/error_SoftML.size
+        print('CE2:SNR=5, SoftML accuracy %.4f' % accuracy_SoftML)
+
+        start = end
 
 
-    Hf2 = H_test_padding2.detach().cpu().numpy()
-    Hf2 = Hf2[:,0,:,:] + 1j*Hf2[:,1,:,:] 
-    Hf2 = np.reshape(Hf2, [-1,2,2,256], order = 'F')
 
-    eps = 0.1
-
-    X_SoftML, X_SoftMLbits = SoftMLReceiver(Yd, Hf1, SNRdb = 5)
-
-    error_SoftML = np.abs(X_SoftMLbits - X_test.numpy())
-    accuracy_SoftML = np.sum(error_SoftML < eps)/error_SoftML.size
-    print('CE1:SNR=',5,'SoftML accuracy %.4f' % accuracy_SoftML)
-
-
-    X_SoftML, X_SoftMLbits = SoftMLReceiver(Yd, Hf2, SNRdb = 5)
-
-    error_SoftML = np.abs(X_SoftMLbits - X_test.numpy())
-    accuracy_SoftML = np.sum(error_SoftML < eps)/error_SoftML.size
-    print('CE2:SNR=',5,'SoftML accuracy %.4f' % accuracy_SoftML)
         

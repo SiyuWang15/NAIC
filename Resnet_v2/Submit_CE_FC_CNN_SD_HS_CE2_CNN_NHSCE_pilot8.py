@@ -16,7 +16,9 @@ from torch.optim import lr_scheduler
 from torch.utils.data import Dataset, DataLoader
 from MLreceiver_wo_print import *
 from LSreveiver import *
-from SoftMLreceiver import SoftMLReceiver
+from SoftMLreceiver_wo_print import SoftMLReceiver
+import DeepRx_port as pD
+import DeepRx_model
 parser = argparse.ArgumentParser()
 parser.add_argument('--model', type = str, default = 'Resnet34')
 parser.add_argument('--gpu_list',  type = str,  default='6,7', help='input gpu list')
@@ -52,20 +54,21 @@ def get_LS(Yd_input, Hf):
 batch_size = 2000
 epochs = 300
 
-
+lr_threshold = 1e-6
+lr_freq = 10
 num_workers = 16
 print_freq = 100
 Pilot_num = 8
+best_nmse = 1
+
 
 
 # 加载用于测试的接收数据 Y shape=[batch*2048]
-# if Pilot_num == 32:
-#     Y = np.loadtxt('/data/CuiMingyao/AI_competition/OFDMReceiver/Y_1.csv', dtype=np.float32,delimiter=',')
+if Pilot_num == 32:
+    Y = np.loadtxt('/data/CuiMingyao/AI_competition/OFDMReceiver/Y_1.csv', dtype=np.float32,delimiter=',')
 
-# if Pilot_num == 8:
-#     Y = np.loadtxt('/data/CuiMingyao/AI_competition/OFDMReceiver/Y_2.csv', dtype=np.float32,delimiter=',')
-d = np.load('evaluation.npy', allow_pickle=True).item()
-Y = d['y']
+if Pilot_num == 8:
+    Y = np.loadtxt('/data/CuiMingyao/AI_competition/OFDMReceiver/Y_2.csv', dtype=np.float32,delimiter=',')
 
 # Model load for channel estimation
 ##### model construction for channel estimation #####
@@ -85,48 +88,48 @@ state_dicts = torch.load(path)
 FC.load_state_dict(state_dicts['fc'])
 CNN.load_state_dict(state_dicts['cnn'])
 print("Model for CE has been loaded!")
-# FC = torch.nn.DataParallel( FC ).cuda()  # model.module
-# CNN = torch.nn.DataParallel( CNN ).cuda()  # model.module
 
 
-SD = XYH2X_ResNet18()
 
-SD_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/XYH2X_Resnet18_SD_mode'+str(mode)+'_Pilot'+str(Pilot_num)+'.pth.tar'                
-SD.load_state_dict(torch.load(SD_path)['state_dict'])
-print("Weight For SD PD Loaded!")
-# SD = torch.nn.DataParallel( SD ).cuda()  # model.module
-# SD = SD.cuda()
+SD_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/HS_SD_Pilot8' 
+SD = pD.DeepRx(SD_path,cuda_gpu=True,gpus=[0,1])   
 
 
 CE2 = XDH2H_Resnet()
-
-CE2_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/XDH2H_'+str(args.model)+'_CE2_mode'+str(mode)+'_Pilot'+str(Pilot_num)+'.pth.tar'                
+'''
+CE2_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/CE2_0.14927.pth'                
 CE2.load_state_dict(torch.load(CE2_path)['state_dict'])
 print("Weight For SD PD Loaded!")
-# CE2 = torch.nn.DataParallel( CE2 ).cuda()  # model.module
+'''
+CE2_path = '/data/CuiMingyao/AI_competition/OFDMReceiver/Modelsave/SD_CE2_0.14679.pth'  
+state_dicts = torch.load(CE2_path)  
+CE2 = torch.nn.DataParallel( CE2 ).cuda()      
+CE2.load_state_dict(state_dicts['CE2'])
+print("Weight For SD PD Loaded!")
 
 
-
-
-
-
-
+FC = torch.nn.DataParallel( FC ).cuda()  # model.module
+CNN = torch.nn.DataParallel( CNN ).cuda()  # model.module
 
 
 Y = torch.tensor(Y)
 X_bits = []
 print('==========Begin Testing=========')
 iter = 0
-
-
-
-SD.eval()
+N = 3
+SD[0].eval()
+SD[1].eval()
 FC.eval()
 CNN.eval()
 CE2.eval()
+
 with torch.no_grad():
+
+    # print('lr:%.4e' % optimizer_CE2.param_groups[0]['lr'])
+
     for i in range(5):
         Y_test = Y[i*2000 : (i+1)*2000, :]
+
         Ns = Y_test.shape[0]
 
 
@@ -139,85 +142,84 @@ with torch.no_grad():
 
         # 第一层网络输入
         input1 = Yp_input_test.reshape(Ns, 2*2*256) # 取出接收导频信号，实部虚部*2*256
+        input1 = input1.cuda()
         # 第一层网络输出
         output1 = FC(input1)
+        print('第一层')
 
         # 第二层网络输入预处理
         output1 = output1.reshape(Ns, 2, 4, 256)
-        input2 = torch.cat([Yd_input_test, Yp_input_test, output1], 2)
-
+        # input2 = torch.cat([Yd_input_test, Yp_input_test, output1], 2)
+        input2 = torch.cat([Yd_input_test.cuda(), Yp_input_test.cuda(), output1], 2)    
         # 第二层网络的输出
         output2 = CNN(input2)
+        output2 = output2.reshape(Ns, 2, 4, 32)
+        print('第二层')
 
-        #第三层网络输入预处理
-        H_test_padding = output2.reshape(Ns, 2, 4, 32)
-        H_test_padding = torch.cat([H_test_padding, torch.zeros(Ns,2,4,256-32, requires_grad=True)],3)
-        H_test_padding = H_test_padding.permute(0,2,3,1)
+        start = output2
+        for idx in range(N):
+            #第三层网络输入预处理
+            H_test_padding = start.cpu()
+            H_test_padding = torch.cat([H_test_padding, torch.zeros(Ns,2,4,256-32, requires_grad=True)],3)
+            H_test_padding = H_test_padding.permute(0,2,3,1)
 
-        H_test_padding = torch.fft(H_test_padding, 1)/20
-        H_test_padding = H_test_padding.permute(0,3,1,2).contiguous() #df1为对应的频域形式，维度为Batch*2*4*256
-
-
-        # ML 初步估计
-        # X_LS, _ = get_ML(Yd_input_test, H_test_padding.detach().cpu().numpy())
-
-        X_LS = get_LS(Yd_input_test, H_test_padding.detach().cpu())
-        X_input_test = torch.zeros([Ns, 2, 2, 256], dtype = torch.float32)
-        X_input_test[:,0,:,:] = torch.tensor(X_LS.real, dtype = torch.float32)
-        X_input_test[:,1,:,:] = torch.tensor(X_LS.imag, dtype = torch.float32)
+            H_test_padding = torch.fft(H_test_padding, 1)/20
+            H_test_padding = H_test_padding.permute(0,3,1,2).contiguous() #df1为对应的频域形式，维度为Batch*2*4*256
 
 
+            output3 = pD.Pred_DeepRX(SD, torch.reshape(H_test_padding.cuda(), [-1, 2,2,2,256]), Yd_input_test.cuda())
+            print('第三层')
+            # X_refine_test = ((output3 > 0.5)*2. - 1)/np.sqrt(2)
+            
+            X_1 = output3.reshape([Ns,2,256,2])
+            X_1 = X_1.permute(0,3,1,2).contiguous()
+
+            # 第四层网络的输入
+            # input4 = torch.cat([X_input_test, Yd_input_test, H_test_padding], 2)
+            # input4 = torch.cat([X_1, Yd_input_test, H_test_padding], 2)
+            input4 = torch.cat([X_1, Yd_input_test.cuda(), H_test_padding.cuda()], 2)
+            output4 = CE2(input4)
+            output4 = output4.reshape(Ns, 2, 4, 32)
+            print('第四层')
+
+            #第五层网络输入预处理
+            end = output4
+
+            H_test_padding2 = end.cpu().detach()
+            H_test_padding2 = torch.cat([H_test_padding2, torch.zeros(Ns,2,4,256-32, requires_grad=True)],3)
+            H_test_padding2 = H_test_padding2.permute(0,2,3,1)
+
+            H_test_padding2 = torch.fft(H_test_padding2, 1)/20
+            H_test_padding2 = H_test_padding2.permute(0,3,1,2).contiguous() #df1为对应的频域形式，维度为Batch*2*4*256
+
+            start = end
         
-        input3 = torch.cat([X_input_test, Yp_input_test, Yd_input_test, H_test_padding], 2)
-
-        # 第三层网络的输出
-        output3 = SD(input3)
-
-        # X_refine_test = ((output3 > 0.5)*2. - 1)/np.sqrt(2)
-        
-        output3 = output3.reshape([Ns,2,256,2])
-        output3 = output3.permute(0,3,1,2).contiguous()
-
-        # input4 = torch.cat([X_input_test, Yd_input_test, H_test_padding], 2)
-        input4 = torch.cat([output3, Yd_input_test, H_test_padding], 2)
-
-        output4 = CE2(input4)
-        output4 = output4.reshape(Ns, 2, 4, 32)
-        # 计算loss
-
-
-        H_test_padding2 = output4
-        H_test_padding2 = torch.cat([H_test_padding2, torch.zeros(Ns,2,4,256-32, requires_grad=True)],3)
-        H_test_padding2 = H_test_padding2.permute(0,2,3,1)
-
-        H_test_padding2 = torch.fft(H_test_padding2, 1)/20
-        H_test_padding2 = H_test_padding2.permute(0,3,1,2).contiguous() #df1为对应的频域形式，维度为Batch*2*4*256
-
-
+        eps = 0.1
         # ML性能对比
         Yd = np.array(Yd_input_test[:,0,:,:] + 1j*Yd_input_test[:,1,:,:])
 
-
-        Hf2 = H_test_padding2.detach().cpu().numpy()
+        Hf2 = H_test_padding2.numpy()
         Hf2 = Hf2[:,0,:,:] + 1j*Hf2[:,1,:,:] 
         Hf2 = np.reshape(Hf2, [-1,2,2,256], order = 'F')
 
+        X_SoftML, X_SoftMLbits, _ = SoftMLReceiver(Yd, Hf2, SNRdb = 5)
 
-
-        X_SoftML, X_SoftMLbits = SoftMLReceiver(Yd, Hf2, SNRdb = 5)
 
         X_bits.append(X_SoftMLbits)
 
         print('Love live')
-
+    
 X_bits = np.concatenate(X_bits , axis = 0 )
 
 if Pilot_num == 32:
     X_1 = np.array(np.floor(X_bits + 0.5), dtype=np.bool)
-    X_1.tofile('./X_pre_1_CE_FC_CNN_SD_XYH2X_Resnet18_CE2_' + str(args.model)+ '.bin')
+    X_1.tofile('./X_pre_1_CE_FC_CNN_SD_HS_CE2_Resnet34_NHSCE_' + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) +'_N_'+str(N)+ '.bin')
 
 
 if Pilot_num == 8:
     X_1 = np.array(np.floor(X_bits + 0.5), dtype=np.bool)
-    X_1.tofile('./X_pre_2_CE_FC_CNN_SD_XYH2X_Resnet18_CE2_' + str(args.model)+ '.bin')
-            
+    X_1.tofile('./X_pre_2_CE_FC_CNN_SD_HS_CE2_Resnet34_NHSCE_' + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) +'_N_'+str(N)+ '.bin')
+
+
+
+        

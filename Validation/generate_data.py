@@ -39,7 +39,7 @@ def generatorXY(batch, H, Pilot_num,SNR,m):
     input_labels = []
     input_samples = []
     input_channels = []
-    
+    np.random.seed(42)
     for row in range(0, batch):
         bits0 = np.random.binomial(n=1, p=0.5, size=(128 * 4,))
         bits1 = np.random.binomial(n=1, p=0.5, size=(128 * 4,))
