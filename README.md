@@ -7,6 +7,6 @@ Out codes are built mainly on pytorch1.6.0. To quickly start, run
 
 All commands can be found in run.sh.
 
-To generate final submitted files, please uncomment line 25-35
+To generate final submitted files, please uncomment line 23-31
 
 To train our model, please read comments and use corresponding commands, if you have any questions, feel free to contact us.
