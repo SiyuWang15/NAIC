@@ -8,6 +8,8 @@
 *Pilot*
 *.log
 *.npy
+*.pkl
+*.bin
 *.ipynb
 *ipynb*
 workspace/

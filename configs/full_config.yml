@@ -1,5 +1,5 @@
 # config for full runner
-cnnmodel: base # base or resnet34 or resnet50
+cnnmodel: resnet34 # base or resnet34 or resnet50
 Pn: 8
 mode: 0
 use_yp: True
@@ -9,5 +9,5 @@ FC:
   h_dim: 4096
   out_dim: 2048
   n_blocks: 2
-resume: BestResnet18
+resume: BestResnet34
 run_mode: validation  # validation or testing
