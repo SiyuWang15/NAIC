@@ -7,9 +7,8 @@ import shutil
 import logging
 import math
 import multiprocessing as mp
-import sys
+# import sys
 import time
-sys.path.append('..')
 from utils import *
 from func import SoftMLReceiver as MLReceiver
 from Estimators import CNN_Estimation, FC_ELU_Estimation, NMSELoss, ResNet34
@@ -33,15 +32,15 @@ class FullRunner():
         else:
             raise NotImplementedError
         FC = FC_ELU_Estimation(self.FCconf.in_dim, self.FCconf.h_dim, self.FCconf.out_dim, self.FCconf.n_blocks)
-        if self.config.model in ['cnn', 'resnet34']:
-            fp = os.path.join(f'/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_{self.mode}_Pn_{self.Pn}/CNN',\
+        fp = os.path.join(f'/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_{self.mode}_Pn_{self.Pn}/CNN',\
              self.config.resume, 'checkpoints/best.pth')
-        elif self.config.model == 'ema':
-            fp = os.path.join(f'/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_{self.mode}_Pn_{self.Pn}/EMA',\
-             self.config.resume, 'checkpoints/best.pth')
-
+        # if self.config.model in ['cnn', 'resnet34']:
+        #     fp = os.path.join(f'/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_{self.mode}_Pn_{self.Pn}/CNN',\
+        #      self.config.resume, 'checkpoints/best.pth')
+        # elif self.config.model == 'ema':
+        #     fp = os.path.join(f'/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_{self.mode}_Pn_{self.Pn}/EMA',\
+        #      self.config.resume, 'checkpoints/best.pth')
         shutil.copy(fp, os.path.join(self.config.log_dir, 'best.pth'))
-
         logging.info(f'loading state dicts from [{fp}]')
         state_dicts = torch.load(fp)
         FC.load_state_dict(state_dicts['fc'])

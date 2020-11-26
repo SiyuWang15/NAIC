@@ -1,5 +1,5 @@
 mode: 0
-Pn: 32
+Pn: 8
 model: fc
 n_epochs: 300
 print_freq: 100

@@ -1,6 +1,10 @@
-import torch
+import numpy as np
 import torch.nn as nn
+import torch
 import torch.nn.functional as F
+from torch.utils.data import Dataset
+from collections import OrderedDict
+import math
 
 class BasicBlock(nn.Module):
     expansion = 1
@@ -31,45 +35,12 @@ class BasicBlock(nn.Module):
         return out
 
 
-# 用于ResNet50,101和152的残差块，用的是1x1+3x3+1x1的卷积
-class Bottleneck(nn.Module):
-    # 前面1x1和3x3卷积的filter个数相等，最后1x1卷积是其expansion倍
-    expansion = 4
-
-    def __init__(self, in_planes, planes, stride=1):
-        super(Bottleneck, self).__init__()
-        self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(planes)
-        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3,
-                               stride=stride, padding=1, bias=False)
-        self.bn2 = nn.BatchNorm2d(planes)
-        self.conv3 = nn.Conv2d(planes, self.expansion*planes,
-                               kernel_size=1, bias=False)
-        self.bn3 = nn.BatchNorm2d(self.expansion*planes)
-
-        self.shortcut = nn.Sequential()
-        if stride != 1 or in_planes != self.expansion*planes:
-            self.shortcut = nn.Sequential(
-                nn.Conv2d(in_planes, self.expansion*planes,
-                          kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm2d(self.expansion*planes)
-            )
-
-    def forward(self, x):
-        out = F.relu(self.bn1(self.conv1(x)))
-        out = F.relu(self.bn2(self.conv2(out)))
-        out = self.bn3(self.conv3(out))
-        out += self.shortcut(x)
-        out = F.relu(out)
-        return out
-
-
-class ResNet(nn.Module):
+class XYH2X_ResNet(nn.Module):
     def __init__(self, block=BasicBlock, num_blocks=[2,2,2,2], num_classes=1024):
-        super(ResNet, self).__init__()
+        super(XYH2X_ResNet, self).__init__()
         self.in_planes = 64
 
-        self.conv1 = nn.Conv2d(1, 64, kernel_size=3,
+        self.conv1 = nn.Conv2d(2, 64, kernel_size=3,
                        stride=1, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(64)
         
@@ -102,21 +73,10 @@ class ResNet(nn.Module):
         # out = F.avg_pool2d(out, 4)
         out = out.view(out.size(0), -1)
         out = self.linear(out)
+        out = out.view(out.size(0), 2, 2, 256) + x[:, :, 0:2, :]
+        out = out.view(out.size(0), -1)
         out = torch.sigmoid(out)
         return out
 
-
-def ResNet18():
-    return ResNet(BasicBlock, [2,2,2,2])
-
-def ResNet34():
-    return ResNet(BasicBlock, [3,4,6,3])
-
-def ResNet50():
-    return ResNet(Bottleneck, [3,4,6,3])
-
-def ResNet101():
-    return ResNet(Bottleneck, [3,4,23,3])
-
-def ResNet152():
-    return ResNet(Bottleneck, [3,8,36,3])
+def XYH2X_ResNet18():
+    return XYH2X_ResNet(BasicBlock, [2,2,2,2])

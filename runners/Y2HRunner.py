@@ -1,3 +1,7 @@
+r'''
+    This is training runner for channel estimation. FC for coarse estimation and CNN for finer estimation.
+'''
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -5,10 +9,10 @@ from torch.utils.data import DataLoader
 import numpy as np 
 import logging
 import os
-import sys
-sys.path.append('..')
-from Estimators import CNN_Estimation, FC_ELU_Estimation, NMSELoss, ResNet34, ResNet50, ResNet101, Densenet
-from data import get_YH_data_random
+# import sys
+# sys.path.append('..')
+from Estimators import CNN_Estimation, FC_ELU_Estimation, NMSELoss, ResNet34
+from data import get_YH_data_random 
 from utils import *
 
 class Y2HRunner():
@@ -45,7 +49,7 @@ class Y2HRunner():
         logging.info('Data Loaded!')
         FC = FC_ELU_Estimation(self.config.FC.in_dim, self.config.FC.h_dim, self.config.FC.out_dim, self.config.FC.n_blocks)
         if not self.config.train.FC_resume == 'None':
-            fp = os.path.join(f'/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_{self.mode}_Pn_{self.Pn}/FC', self.config.train.FC_resume, 'checkpoints/best.pth')
+            fp = os.path.join(f'./workspace/ResnetY2HEstimator/mode_{self.mode}_Pn_{self.Pn}/FC', self.config.train.FC_resume, 'checkpoints/best.pth')
             try:
                 FC.load_state_dict(torch.load(fp))
             except:
@@ -116,15 +120,11 @@ class Y2HRunner():
             CNN = CNN_Estimation().to(device)
         elif self.config.cnnmodel == 'resnet34':
             CNN = ResNet34().to(device)
-        elif self.config.cnnmodel == 'resnet50':
-            CNN = ResNet50().to(device)
-        elif self.config.cnnmodel == 'resnet101':
-            CNN = nn.DataParallel(ResNet101()).to(device)
-        elif self.config.cnnmodel == 'densenet':
-            CNN = nn.DataParallel(Densenet()).to(device)
-            logging.info('This is densenet.')
+        else:
+            raise NotImplementedError
+        
         if not self.config.train.CNN_resume == 'None':
-            fp = os.path.join(f'/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_{self.mode}_Pn_{self.Pn}/CNN', \
+            fp = os.path.join(f'./workspace/ResnetY2HEstimator/mode_{self.mode}_Pn_{self.Pn}/CNN', \
                 self.config.train.CNN_resume, 'checkpoints/best.pth')
             state_dicts = torch.load(fp)
             CNN.load_state_dict(state_dicts['cnn'])
@@ -132,7 +132,7 @@ class Y2HRunner():
             logging.info(f'load state dicts of CNN and FC from {fp}.')
         else:
             assert not self.config.train.FC_resume == 'None'
-            fp = os.path.join(f'/data/siyu/NAIC/workspace/ResnetY2HEstimator/mode_{self.mode}_Pn_{self.Pn}/FC', self.config.train.FC_resume, 'checkpoints/best.pth')
+            fp = os.path.join(f'./workspace/ResnetY2HEstimator/mode_{self.mode}_Pn_{self.Pn}/FC', self.config.train.FC_resume, 'checkpoints/best.pth')
             try:
                 FC.load_state_dict(torch.load(fp)['fc'])
             except:
