@@ -71,9 +71,7 @@ class FullRunner():
         val_loader = DataLoader(val_set, batch_size=self.config.batch_size, shuffle=False, drop_last=False, num_workers=16)
         logging.info('Data Loaded.')
         predXs = []
-        predXs2 = []
         predHts = []
-        predHts2 = []
         Hlabels = []
         Xlabels = []
         with torch.no_grad():
@@ -89,43 +87,24 @@ class FullRunner():
                     cnn_input = torch.cat([Yd.to(device), Yp4cnn.to(device), Hf], dim=2)
                 Ht = CNN(cnn_input)
                 Ht = Ht.reshape(bs, 2, 4, 32).detach().cpu().numpy()
-                Ht4later = Ht.copy()
                 predHts.append(Ht.copy())
                 Ht = Ht[:, 0, :, :] + 1j * Ht[:, 1, :, :]
                 Hf_pred = np.fft.fft(Ht, 256) / 20.
                 Hf_pred = np.reshape(Hf_pred, [bs, 2, 2, 256], order = 'F')
-                Yd4ml = Yd.numpy()
-                Yd4ml = Yd4ml[:, 0, :, :] + 1j * Yd4ml[:, 1, :, :]
-                _, predX = MLReceiver(Yd4ml, Hf_pred)
+                Yd = Yd.numpy()
+                Yd = Yd[:, 0, :, :] + 1j * Yd[:, 1, :, :]
+                _, predX = MLReceiver(Yd, Hf_pred)
                 predXs.append(predX)
                 Hlabels.append(H_label.numpy())
                 Xlabels.append(X_label.numpy())
-
-                Hf2 = process_H(Ht4later)
-                # print(Yd.shape, Yp4cnn.shape, Hf2.shape)
-                cnn_input2 = torch.cat([Yd.to(device), Yp4cnn.to(device), torch.Tensor(Hf2).to(device)], dim  =2)
-                Ht2 = CNN(cnn_input2)
-                Ht2 = Ht2.reshape(bs, 2, 4, 32).detach().cpu().numpy()
-                predHts2.append(Ht2.copy())
-
-                Ht2 = Ht2[:, 0, :, :] + 1j * Ht2[:, 1, :, :]
-                Hf_pred2 = np.fft.fft(Ht2, 256) / 20.
-                Hf_pred2 = np.reshape(Hf_pred2, [bs, 2, 2, 256], order = 'F')
-                _, predX2 = MLReceiver(Yd4ml, Hf_pred2)
-                predXs2.append(predX2)
-
                 logging.info(f'[{i+1}]/[{len(val_loader)}] complete.')
             predXs = np.concatenate(predXs, axis = 0)
             predHts = np.concatenate(predHts, axis = 0)
-            predXs2 = np.concatenate(predXs2, axis = 0)
-            predHts2 = np.concatenate(predHts2, axis = 0)
             Hlabels = np.concatenate(Hlabels, axis = 0)
             Xlabels = np.concatenate(Xlabels, axis = 0)
-            acc1 = (predXs == Xlabels).astype('float32').mean()
-            nmse1 = self.NMSE(predHts, Hlabels)
-            acc2 = (predXs2 == Xlabels).astype('float32').mean()
-            nmse2 = self.NMSE(predHts2, Hlabels)
-            logging.info(f'validation on {self.config.resume}, acc1 {acc1:.5f}, nmse1: {nmse1:.5f}, acc2: {acc2:.5f}, nmse2: {nmse2:.5f}')
+            acc = (predXs == Xlabels).astype('float32').mean()
+            nmse = self.NMSE(predHts, Hlabels)
+            logging.info(f'validation on {self.config.resume}, acc: {acc:.5f}, nmse: {nmse:.5f}')
 
     def test(self):
         device = 'cuda'
