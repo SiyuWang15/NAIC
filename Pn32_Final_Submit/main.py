@@ -60,15 +60,15 @@ Y = np.loadtxt('data/Y_1.csv', dtype=np.float32, delimiter=',')
 
 
 print('Begin generating X_pre_1_1.bin')
-submit1(Y)
+# submit1(Y)
 print('==============================')
 
 print('Begin generating X_pre_1_2.bin')
-submit2(Y)
+# submit2(Y)
 print('==============================')
 
 print('Begin generating X_pre_1_3.bin')
-submit3(Y)
+# submit3(Y)
 print('==============================')
 
 print('Begin generating X_pre_1_4.bin')

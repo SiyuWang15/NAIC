@@ -142,7 +142,7 @@ def ofdm_simulate(codeword, channelResponse, SNRdb, mu, CP_flag, K, P, CP, pilot
 
 def MIMO(X, HMIMO, SNRdb,flag,P):
     P = P * 2
-    Pilot_file_name = '/data/siyu/NAIC/dataset/Pilot_' + str(P)
+    Pilot_file_name = './dataset/Pilot_' + str(P)
     bits = np.loadtxt(Pilot_file_name, delimiter = ',')
     # if os.path.isfile(Pilot_file_name):
     #     bits = np.loadtxt(Pilot_file_name, delimiter=',')

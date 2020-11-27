@@ -17,7 +17,8 @@ def run_y2h(args):
         config.log_prefix = f'workspace/ResnetY2HEstimator/mode_{config.mode}_Pn_{config.Pn}/CNN'
     config.log_dir = os.path.join(config.log_prefix, args.time)
     config.ckpt_dir = os.path.join(config.log_dir, 'checkpoints')
-    os.makedirs(config.ckpt_dir)
+    if not os.path.isdir(config.ckpt_dir):
+        os.makedirs(config.ckpt_dir)
     set_logger(config)
     logging.info(config)
     runner = Y2HRunner(config)
@@ -28,7 +29,8 @@ def run_sdce(args):
     config.log_prefix = f'workspace/ResnetY2HEstimator/mode_{config.mode}_Pn_{config.Pn}/SDCE'
     config.log_dir = os.path.join(config.log_prefix, args.time)
     config.ckpt_dir = os.path.join(config.log_dir, 'checkpoints')
-    os.makedirs(config.ckpt_dir)
+    if not os.path.isdir(config.ckpt_dir):
+        os.makedirs(config.ckpt_dir)
     set_logger(config)
     logging.info(config)
     runner = SDCERunner(config)
@@ -40,7 +42,8 @@ def run_ema(args):
     config.log_prefix = f'workspace/ResnetY2HEstimator/mode_{config.mode}_Pn_{config.Pn}/EMA'
     config.log_dir = os.path.join(config.log_prefix, args.time)
     config.ckpt_dir = os.path.join(config.log_dir, 'checkpoints')
-    os.makedirs(config.ckpt_dir)
+    if not os.path.isdir(config.ckpt_dir):
+        os.makedirs(config.ckpt_dir)
     set_logger(config)
     logging.info(config)
     runner = EMAY2HRunner(config)
@@ -51,7 +54,8 @@ def run_full(args):
     config.run_mode = args.runner
     config.Pn = args.Pn
     config.log_dir = os.path.join('workspace', config.run_mode, f'mode_{config.mode}_Pn_{config.Pn}', args.time)
-    os.makedirs(config.log_dir)
+    if not os.path.isdir(config.ckpt_dir):
+        os.makedirs(config.ckpt_dir)
     set_logger(config)
     logging.info(config)
     runner = FullRunner(config)

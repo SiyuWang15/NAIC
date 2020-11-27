@@ -11,8 +11,8 @@ from .datasets import *
 from .Communication import *
 
 def get_YH_data_random(mode, Pn):
-    N1 = 2000
-    data1 = open('./dataset/H_val.bin','rb')
+    N1 = 320000
+    data1 = open('./dataset/H.bin','rb')
     H1 = struct.unpack('f'*2*2*2*32*N1,data1.read(4*2*2*2*32*N1))
     H1 = np.reshape(H1,[N1,2,4,32])
     H_tra = H1[:,1,:,:]+1j*H1[:,0,:,:]   # time-domain channel for training 

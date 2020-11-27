@@ -41,8 +41,8 @@ def submit1(Y):
     N = 2
 
     with torch.no_grad():
-        for i in range(5):
-            Y_test = Y[i*2000 : (i+1)*2000, :]
+        for i in range(2):
+            Y_test = Y[i*5000 : (i+1)*5000, :]
             Ns = Y_test.shape[0]
 
             # 接收数据与接收导频划分
@@ -114,7 +114,7 @@ def submit1(Y):
             X_SoftML, X_SoftMLbits, _ = SoftMLReceiver(Yd, Hf2, SNRdb = 6)
             X_bits.append(X_SoftMLbits)
 
-            print(('batch[{0}]/5 completed!'.format(i)))
+            print(('batch[{0}]/2 completed!'.format(i)))
 
     X_bits = np.concatenate(X_bits , axis = 0 )
 
@@ -163,8 +163,8 @@ def submit2(Y):
     N = 2
 
     with torch.no_grad():
-        for i in range(5):
-            Y_test = Y[i*2000 : (i+1)*2000, :]
+        for i in range(2):
+            Y_test = Y[i*5000 : (i+1)*5000, :]
             Ns = Y_test.shape[0]
 
             # 接收数据与接收导频划分
@@ -234,7 +234,7 @@ def submit2(Y):
             X_SoftML, X_SoftMLbits, _ = SoftMLReceiver(Yd, Hf2, SNRdb = 6)
             X_bits.append(X_SoftMLbits)
 
-            print(('batch[{0}]/5 completed!'.format(i)))
+            print(('batch[{0}]/2 completed!'.format(i)))
 
     X_bits = np.concatenate(X_bits , axis = 0 )
 
@@ -280,8 +280,8 @@ def submit3(Y):
     N = 1
 
     with torch.no_grad():
-        for i in range(5):
-            Y_test = Y[i*2000 : (i+1)*2000, :]
+        for i in range(2):
+            Y_test = Y[i*5000 : (i+1)*5000, :]
             Ns = Y_test.shape[0]
 
             # 接收数据与接收导频划分
@@ -398,8 +398,8 @@ def submit4(Y):
     N = 1
 
     with torch.no_grad():
-        for i in range(5):
-            Y_test = Y[i*2000 : (i+1)*2000, :]
+        for i in range(2):
+            Y_test = Y[i*5000 : (i+1)*5000, :]
             Ns = Y_test.shape[0]
 
             # 接收数据与接收导频划分
@@ -414,7 +414,7 @@ def submit4(Y):
             input1 = input1.cuda()
             # 第一层网络输出
             output1 = FC(input1)
-            print('第一层')
+#             print('第一层')
 
             # 第二层网络输入
             output1 = output1.reshape(Ns, 2, 4, 256)
@@ -470,7 +470,7 @@ def submit4(Y):
             X_SoftML, X_SoftMLbits, _ = SoftMLReceiver(Yd, Hf2, SNRdb = 6)
             X_bits.append(X_SoftMLbits)
 
-            print(('batch[{0}]/5 completed!'.format(i)))
+            print(('batch[{0}]/2 completed!'.format(i)))
 
     X_bits = np.concatenate(X_bits , axis = 0 )
 
@@ -516,8 +516,8 @@ def submit5(Y):
     N = 1
 
     with torch.no_grad():
-        for i in range(5):
-            Y_test = Y[i*2000 : (i+1)*2000, :]
+        for i in range(2):
+            Y_test = Y[i*5000 : (i+1)*5000, :]
             Ns = Y_test.shape[0]
 
             # 接收数据与接收导频划分
@@ -588,7 +588,7 @@ def submit5(Y):
             X_SoftML, X_SoftMLbits, _ = SoftMLReceiver(Yd, Hf2, SNRdb = 6)
             X_bits.append(X_SoftMLbits)
 
-            print(('batch[{0}]/5 completed!'.format(i)))
+            print(('batch[{0}]/2 completed!'.format(i)))
 
     X_bits = np.concatenate(X_bits , axis = 0 )
 

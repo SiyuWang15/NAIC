@@ -3,7 +3,7 @@ cnnmodel: resnet34 # base or resnet34 or resnet50
 Pn: 8
 mode: 0
 use_yp: True
-batch_size: 500
+batch_size: 1000
 FC:
   in_dim: 1024
   h_dim: 4096

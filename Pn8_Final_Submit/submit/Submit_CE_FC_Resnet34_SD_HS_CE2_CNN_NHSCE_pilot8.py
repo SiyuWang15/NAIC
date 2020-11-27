@@ -110,8 +110,8 @@ def run(prefix = './', gpu_list = '6,7', N = 3):
 
         # print('lr:%.4e' % optimizer_CE2.param_groups[0]['lr'])
 
-        for i in range(5):
-            Y_test = Y[i*2000 : (i+1)*2000, :]
+        for i in range(2):
+            Y_test = Y[i*5000 : (i+1)*5000, :]
 
             Ns = Y_test.shape[0]
 
@@ -128,7 +128,7 @@ def run(prefix = './', gpu_list = '6,7', N = 3):
             input1 = input1.cuda()
             # 第一层网络输出
             output1 = FC(input1)
-            print('第一层')
+#             print('第一层')
 
             # 第二层网络输入预处理
             output1 = output1.reshape(Ns, 2, 4, 256)
@@ -137,7 +137,7 @@ def run(prefix = './', gpu_list = '6,7', N = 3):
             # 第二层网络的输出
             output2 = CNN(input2)
             output2 = output2.reshape(Ns, 2, 4, 32)
-            print('第二层')
+#             print('第二层')
 
             start = output2
             for idx in range(N):
@@ -151,7 +151,7 @@ def run(prefix = './', gpu_list = '6,7', N = 3):
 
 
                 output3 = pD.Pred_DeepRX(SD, torch.reshape(H_test_padding.cuda(), [-1, 2,2,2,256]), Yd_input_test.cuda())
-                print('第三层')
+#                 print('第三层')
                 # X_refine_test = ((output3 > 0.5)*2. - 1)/np.sqrt(2)
                 
                 X_1 = output3.reshape([Ns,2,256,2])
@@ -163,7 +163,7 @@ def run(prefix = './', gpu_list = '6,7', N = 3):
                 input4 = torch.cat([X_1, Yd_input_test.cuda(), H_test_padding.cuda()], 2)
                 output4 = CE2(input4)
                 output4 = output4.reshape(Ns, 2, 4, 32)
-                print('第四层')
+#                 print('第四层')
 
                 #第五层网络输入预处理
                 end = output4

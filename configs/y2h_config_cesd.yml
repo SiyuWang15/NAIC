@@ -9,7 +9,7 @@ lr_decay: 50
 lr_threshold: 0.00001
 train:
   lr: 0.0001
-  train_batch_size: 300 # 256 for resnet34, 512 for base
+  train_batch_size: 512 # 256 for resnet34, 512 for base
   val_batch_size: 1000
   CNN_resume: BestResnet18 
   optimizer: adam

@@ -111,8 +111,8 @@ def run(prefix = './', gpu_list = '6,7', N = 3):
 
         # print('lr:%.4e' % optimizer_CE2.param_groups[0]['lr'])
 
-        for i in range(5):
-            Y_test = Y[i*2000 : (i+1)*2000, :]
+        for i in range(2):
+            Y_test = Y[i*5000 : (i+1)*5000, :]
 
             Ns = Y_test.shape[0]
 
@@ -129,7 +129,7 @@ def run(prefix = './', gpu_list = '6,7', N = 3):
             input1 = input1.cuda()
             # 第一层网络输出
             output1 = FC(input1)
-            print('第一层')
+#             print('第一层')
 
             # 第二层网络输入预处理
             output1 = output1.reshape(Ns, 2, 4, 256)
@@ -138,7 +138,7 @@ def run(prefix = './', gpu_list = '6,7', N = 3):
             # 第二层网络的输出
             output2 = CNN(input2)
             output2 = output2.reshape(Ns, 2, 4, 32)
-            print('第二层')
+#             print('第二层')
 
             start = output2
             for idx in range(N):
