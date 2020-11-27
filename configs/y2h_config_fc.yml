@@ -1,0 +1,18 @@
+mode: 0
+Pn: 8
+model: fc
+n_epochs: 300
+print_freq: 100
+lr_decay: 30
+lr_threshold: 0.00001
+train:
+  fc_lr: 0.0003
+  train_batch_size: 512 # 256 for resnet34, 512 for base
+  val_batch_size: 2000
+  FC_resume: None
+  optimizer: adam
+FC:
+  in_dim: 1024
+  h_dim: 4096
+  out_dim: 2048
+  n_blocks: 2
