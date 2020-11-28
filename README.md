@@ -10,6 +10,8 @@ All commands can be found in run.sh.
 
 To generate final submitted files, please uncomment line 34-42 in *run.sh*.
 
+Codes are under directory ./Pn8_Final_Submit and ./Pn32_Final_Submit. 
+
 ## Train our model
 To train our model, you may need several steps:
 
